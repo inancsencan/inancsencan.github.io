@@ -4,11 +4,11 @@
    =========================================================== */
 
 :root {
-  --ink: #16161a; /* main text color */
-  --muted: #6b6b76; /* quieter text */
-  --accent: #2f4fd8; /* links and highlights */
-  --paper: #fdfdfb; /* page background */
-  --line: #e4e4e0; /* borders */
+  --ink: #f8f6f6; /* main text color */
+  --muted: #8c8c8e; /* quieter text */
+  --accent: #e19f2c; /* links and highlights */
+  --paper: #1f1e1e; /* page background */
+  --line: #e19f2c; /* borders */
 }
 
 * {
@@ -21,8 +21,8 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 18px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.25;
 }
 
 /* Keeps everything in a readable column in the middle of the page */
@@ -66,7 +66,7 @@ header nav a:hover {
 /* --- text --------------------------------------------------- */
 
 h1 {
-  font-size: 2.1rem;
+  font-size: 2.5rem;
   line-height: 1.2;
   margin: 0 0 0.5rem;
 }
@@ -78,12 +78,13 @@ h2 {
 
 .tagline {
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   margin: 0 0 2rem;
 }
 
 a {
   color: var(--accent);
+  text-decoration: none;
 }
 
 /* --- the list of links on the projects pages ----------------- */
@@ -91,18 +92,20 @@ a {
 .card-list {
   list-style: none;
   padding: 0;
-  margin: 1.5rem 0 0;
+  margin: 1.25rem 0 0;
 }
 
 .card-list li {
   border: 1px solid var(--line);
   border-radius: 10px;
   margin-bottom: 0.9rem;
-  transition: border-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .card-list li:hover {
-  border-color: var(--accent);
+  box-shadow: inset 0 0 0 4px var(--line);
 }
 
 .card-list a {
@@ -121,6 +124,14 @@ a {
 .card-list .description {
   color: var(--muted);
   font-size: 0.95rem;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.card-list a:hover {
+  text-decoration: none;
 }
 
 /* --- sketch pages ------------------------------------------- */
