@@ -5,6 +5,7 @@ let circleY = 400;
 let directionX = 1;
 let speedX = 5;
 let circleSize = 100;
+let sizeVariation;
 
 function setup() {
   createCanvas(800, 800);
@@ -12,13 +13,15 @@ function setup() {
 
 function draw() {
   background(20, 20, 20, 20);
-  fill(255, 0, 0);
   stroke(255);
   strokeWeight(4);
   let circleY = mouseY;
-  let radius = circleSize / 2;
+
   line(circleX, 0, circleX, height);
-  circle(circleX, circleY, circleSize);
+  //size variation
+  sizeVariation = Math.abs((circleX - 400) / 200) ** 2 + 1;
+  circle(circleX, circleY, circleSize * sizeVariation);
+  let radius = (circleSize / 2) * sizeVariation;
   if (circleX >= width - radius || circleX <= radius) {
     directionX = directionX * -1;
   }
@@ -30,3 +33,8 @@ function mousePressed() {
   //circleX = 0;
   directionX = directionX * -1;
 }
+
+setInterval(function () {
+  console.log("This runs every second");
+  fill(random(255), random(255), random(255));
+}, 1000);
