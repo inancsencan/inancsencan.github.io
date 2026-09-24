@@ -134,6 +134,12 @@ a:hover {
   text-decoration: none;
 }
 
+.card-list a:hover .title {
+  text-shadow:
+    0.7px 0 currentColor,
+    -0.35px 0 currentColor;
+}
+
 /* --- sketch pages ------------------------------------------- */
 
 .back {
