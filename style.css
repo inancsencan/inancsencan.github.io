@@ -4,14 +4,16 @@
    =========================================================== */
 
 :root {
-  --ink: #16161a;          /* main text color */
-  --muted: #6b6b76;        /* quieter text */
-  --accent: #2f4fd8;       /* links and highlights */
-  --paper: #fdfdfb;        /* page background */
-  --line: #e4e4e0;         /* borders */
+  --ink: #16161a; /* main text color */
+  --muted: #6b6b76; /* quieter text */
+  --accent: #2f4fd8; /* links and highlights */
+  --paper: #fdfdfb; /* page background */
+  --line: #e4e4e0; /* borders */
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -24,7 +26,9 @@ body {
 }
 
 /* Keeps everything in a readable column in the middle of the page */
-header, main, footer {
+header,
+main,
+footer {
   max-width: 44rem;
   margin: 0 auto;
 }
@@ -55,7 +59,9 @@ header nav a {
   margin-left: 1.25rem;
 }
 
-header nav a:hover { color: var(--accent); }
+header nav a:hover {
+  color: var(--accent);
+}
 
 /* --- text --------------------------------------------------- */
 
@@ -76,7 +82,9 @@ h2 {
   margin: 0 0 2rem;
 }
 
-a { color: var(--accent); }
+a {
+  color: var(--accent);
+}
 
 /* --- the list of links on the projects pages ----------------- */
 
@@ -93,7 +101,9 @@ a { color: var(--accent); }
   transition: border-color 0.15s ease;
 }
 
-.card-list li:hover { border-color: var(--accent); }
+.card-list li:hover {
+  border-color: var(--accent);
+}
 
 .card-list a {
   display: block;
@@ -123,9 +133,15 @@ a { color: var(--accent); }
   font-size: 0.95rem;
 }
 
-.back:hover { color: var(--accent); }
+.back:hover {
+  color: var(--accent);
+}
 
-canvas { max-width: 100%; }
+canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
 
 /* --- footer -------------------------------------------------- */
 
