@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab 01 — Inanc</title>
+
+    <!-- Three folders deep, so three levels up to the stylesheet -->
+    <link rel="stylesheet" href="../../../style.css" />
+
+    <!-- p5.js, version 2.3.3. Every sketch page needs this line. -->
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.3/lib/p5.min.js"></script>
+
+    <!-- Your code. Keep this line last. -->
+    <script src="sketch.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="site-name" href="../../../index.html">Inanc</a>
+      <nav>
+        <a href="../../../index.html">Home</a>
+        <a href="../../index.html">Projects</a>
+      </nav>
+    </header>
+
+    <main>
+      <a class="back" href="../index.html">&larr; IAT 806</a>
+
+      <h1>Lab 02 — Interactive Drawing</h1>
+      <p class="tagline">Creating interactive visuals with p5.js.</p>
+
+      <!-- The canvas p5 creates gets placed right here. -->
+      <div id="sketch-holder"></div>
+
+      <h2>Notes</h2>
+      <p>
+        I made the circle go along the X-axis and bounce back when it hits the edge of the canvas. 
+        The circle's Y position is controlled by the mouse's Y position. 
+        I also added a feature where the circle changes color every second to a random color. 
+        Circle radius increases according to its distance to the edges of the canvas, in a square ratio.
+        Additionally, when mouse is pressed, the travel direction of the circle is reversed. 
+        I also added a vertical line to visualize the movement. 
+        Background refreshes gradually to create a fading effect.
+      <p><a href="../index.html">&larr; Back to IAT 806</a></p>
+    </footer>
+  </body>
+</html>
