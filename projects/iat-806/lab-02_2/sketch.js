@@ -1,40 +1,278 @@
-console.log("I believe I can do this.. maybe..??");
+console.log(
+  "I know this is the worst way to do this :D but I will revisit this when we learn arrays and objects. I will also add more balls to the simulation.",
+);
 
-let circleX = 400;
-let circleY = 400;
-let directionX = 1;
-let speedX = 5;
-let circleSize = 100;
-let sizeVariation;
+let ball1X, ball2X, ball3X, ball4X, ball5X;
+let ball1Y, ball2Y, ball3Y, ball4Y, ball5Y;
+let speed1X, speed2X, speed3X, speed4X, speed5X;
+let speed1Y, speed2Y, speed3Y, speed4Y, speed5Y;
+let minSpeed = 3;
+let maxSpeed = 10;
+let radius = 50;
+let playerX,
+  playerY,
+  playerRadius = 50;
+let timer = 0;
 
 function setup() {
-  createCanvas(800, 800);
+  const canvas = createCanvas(800, 800);
+  canvas.parent("sketch-holder");
+  ball1X = ball2X = ball3X = ball4X = ball5X = width / 2;
+  ball1Y = ball2Y = ball3Y = ball4Y = ball5Y = height / 2;
+  speed1X = speed2X = speed3X = speed4X = speed5X = 5;
+  speed1Y = speed2Y = speed3Y = speed4Y = speed5Y = 5;
 }
 
 function draw() {
-  background(20, 20, 20, 20);
-  stroke(255);
-  strokeWeight(4);
-  let circleY = mouseY;
+  //frame count
+  timer = timer + 1;
+  //console.log(timer);
 
-  line(circleX, 0, circleX, height);
-  //size variation
-  sizeVariation = Math.abs((circleX - 400) / 200) ** 2 + 1;
-  circle(circleX, circleY, circleSize * sizeVariation);
-  let radius = (circleSize / 2) * sizeVariation;
-  if (circleX >= width - radius || circleX <= radius) {
-    directionX = directionX * -1;
+  //draw background
+  background(20);
+
+  // move
+  ball1X = ball1X + speed1X;
+  ball1Y = ball1Y + speed1Y;
+  ball2X = ball2X + speed2X;
+  ball2Y = ball2Y + speed2Y;
+  ball3X = ball3X + speed3X;
+  ball3Y = ball3Y + speed3Y;
+  ball4X = ball4X + speed4X;
+  ball4Y = ball4Y + speed4Y;
+  ball5X = ball5X + speed5X;
+  ball5Y = ball5Y + speed5Y;
+
+  //calculate distance between player and balls
+  let distance1 = dist(playerX, playerY, ball1X, ball1Y);
+  let distance2 = dist(playerX, playerY, ball2X, ball2Y);
+  let distance3 = dist(playerX, playerY, ball3X, ball3Y);
+  let distance4 = dist(playerX, playerY, ball4X, ball4Y);
+  let distance5 = dist(playerX, playerY, ball5X, ball5Y);
+
+  //increase and decrease player ball radius based on distance to other balls
+  //increase player radius gradually if the distance is more than the sum of the radii of the player and the ball
+  if (
+    (distance1 > playerRadius + radius) & (distance2 > playerRadius + radius) &&
+    distance3 > playerRadius + radius &&
+    distance4 > playerRadius + radius &&
+    distance5 > playerRadius + radius
+  ) {
+    playerRadius = playerRadius + 0.5;
   }
 
-  circleX = circleX + directionX * speedX;
+  // draw player
+  fill(255, 255, 255);
+  circle(playerX, playerY, playerRadius * 2);
+  playerX = mouseX;
+  playerY = mouseY;
+
+  // bounce off the left and right walls, and flip growing/shrinking
+  if (ball1X >= width - radius || ball1X < radius) {
+    speed1X = speed1X * -1;
+    speed1X = speed1X * random(0.5, 1.5);
+    speed1Y = speed1Y * random(-0.5, 1.5);
+  }
+  if (ball2X >= width - radius || ball2X < radius) {
+    speed2X = speed2X * -1;
+    speed2X = speed2X * random(0.5, 1.5);
+    speed2Y = speed2Y * random(-0.5, 1.5);
+  }
+  if (ball3X >= width - radius || ball3X < radius) {
+    speed3X = speed3X * -1;
+    speed3X = speed3X * random(0.5, 1.5);
+    speed3Y = speed3Y * random(-0.5, 1.5);
+  }
+  if (ball4X >= width - radius || ball4X < radius) {
+    speed4X = speed4X * -1;
+    speed4X = speed4X * random(0.5, 1.5);
+    speed4Y = speed4Y * random(-0.5, 1.5);
+  }
+  if (ball5X >= width - radius || ball5X < radius) {
+    speed5X = speed5X * -1;
+    speed5X = speed5X * random(0.5, 1.5);
+    speed5Y = speed5Y * random(-0.5, 1.5);
+  }
+
+  // bounce off the top and bottom walls
+  if (ball1Y >= height - radius || ball1Y < radius) {
+    speed1Y = speed1Y * -1;
+    speed1X = speed1X * random(-0.5, 1.5);
+    speed1Y = speed1Y * random(0.5, 1.5);
+  }
+  if (ball2Y >= height - radius || ball2Y < radius) {
+    speed2Y = speed2Y * -1;
+    speed2X = speed2X * random(-0.5, 1.5);
+    speed2Y = speed2Y * random(0.5, 1.5);
+  }
+  if (ball3Y >= height - radius || ball3Y < radius) {
+    speed3Y = speed3Y * -1;
+    speed3X = speed3X * random(-0.5, 1.5);
+    speed3Y = speed3Y * random(0.5, 1.5);
+  }
+  if (ball4Y >= height - radius || ball4Y < radius) {
+    speed4Y = speed4Y * -1;
+    speed4X = speed4X * random(-0.5, 1.5);
+    speed4Y = speed4Y * random(0.5, 1.5);
+  }
+  if (ball5Y >= height - radius || ball5Y < radius) {
+    speed5Y = speed5Y * -1;
+    speed5X = speed5X * random(-0.5, 1.5);
+    speed5Y = speed5Y * random(0.5, 1.5);
+  }
+
+  //max speed limits
+  if (speed1X > maxSpeed) {
+    speed1X = maxSpeed;
+  }
+  if (speed1X < -maxSpeed) {
+    speed1X = -maxSpeed;
+  }
+  if (speed1Y > maxSpeed) {
+    speed1Y = maxSpeed;
+  }
+  if (speed1Y < -maxSpeed) {
+    speed1Y = -maxSpeed;
+  }
+  if (speed2X > maxSpeed) {
+    speed2X = maxSpeed;
+  }
+  if (speed2X < -maxSpeed) {
+    speed2X = -maxSpeed;
+  }
+  if (speed2Y > maxSpeed) {
+    speed2Y = maxSpeed;
+  }
+  if (speed2Y < -maxSpeed) {
+    speed2Y = -maxSpeed;
+  }
+  if (speed3X > maxSpeed) {
+    speed3X = maxSpeed;
+  }
+  if (speed3X < -maxSpeed) {
+    speed3X = -maxSpeed;
+  }
+  if (speed3Y > maxSpeed) {
+    speed3Y = maxSpeed;
+  }
+  if (speed3Y < -maxSpeed) {
+    speed3Y = -maxSpeed;
+  }
+  if (speed4X > maxSpeed) {
+    speed4X = maxSpeed;
+  }
+  if (speed4X < -maxSpeed) {
+    speed4X = -maxSpeed;
+  }
+  if (speed4Y > maxSpeed) {
+    speed4Y = maxSpeed;
+  }
+  if (speed4Y < -maxSpeed) {
+    speed4Y = -maxSpeed;
+  }
+  if (speed5X > maxSpeed) {
+    speed5X = maxSpeed;
+  }
+  if (speed5X < -maxSpeed) {
+    speed5X = -maxSpeed;
+  }
+  if (speed5Y > maxSpeed) {
+    speed5Y = maxSpeed;
+  }
+  if (speed5Y < -maxSpeed) {
+    speed5Y = -maxSpeed;
+  }
+
+  //min speed limits
+  if (speed1X < minSpeed && speed1X > 0) {
+    speed1X = minSpeed;
+  }
+  if (speed1Y < minSpeed && speed1Y > 0) {
+    speed1Y = minSpeed;
+  }
+  if (speed1X > -minSpeed && speed1X < 0) {
+    speed1X = -minSpeed;
+  }
+  if (speed1Y > -minSpeed && speed1Y < 0) {
+    speed1Y = -minSpeed;
+  }
+  if (speed2X < minSpeed && speed2X > 0) {
+    speed2X = minSpeed;
+  }
+  if (speed2Y < minSpeed && speed2Y > 0) {
+    speed2Y = minSpeed;
+  }
+  if (speed2X > -minSpeed && speed2X < 0) {
+    speed2X = -minSpeed;
+  }
+  if (speed2Y > -minSpeed && speed2Y < 0) {
+    speed2Y = -minSpeed;
+  }
+  if (speed3X < minSpeed && speed3X > 0) {
+    speed3X = minSpeed;
+  }
+  if (speed3Y < minSpeed && speed3Y > 0) {
+    speed3Y = minSpeed;
+  }
+  if (speed3X > -minSpeed && speed3X < 0) {
+    speed3X = -minSpeed;
+  }
+  if (speed3Y > -minSpeed && speed3Y < 0) {
+    speed3Y = -minSpeed;
+  }
+  if (speed4X < minSpeed && speed4X > 0) {
+    speed4X = minSpeed;
+  }
+  if (speed4Y < minSpeed && speed4Y > 0) {
+    speed4Y = minSpeed;
+  }
+  if (speed4X > -minSpeed && speed4X < 0) {
+    speed4X = -minSpeed;
+  }
+  if (speed4Y > -minSpeed && speed4Y < 0) {
+    speed4Y = -minSpeed;
+  }
+  if (speed5X < minSpeed && speed5X > 0) {
+    speed5X = minSpeed;
+  }
+  if (speed5Y < minSpeed && speed5Y > 0) {
+    speed5Y = minSpeed;
+  }
+  if (speed5X > -minSpeed && speed5X < 0) {
+    speed5X = -minSpeed;
+  }
+  if (speed5Y > -minSpeed && speed5Y < 0) {
+    speed5Y = -minSpeed;
+  }
+
+  //initiate balls
+  if (timer > 0) {
+    //initiate ball 1
+    fill(255, 0, 0);
+    circle(ball1X, ball1Y, radius * 2);
+  }
+  if (timer > 100) {
+    //initiate ball 2
+    fill(0, 0, 255);
+    circle(ball2X, ball2Y, radius * 2);
+  }
+  if (timer > 200) {
+    //initiate ball 3
+    fill(255, 255, 0);
+    circle(ball3X, ball3Y, radius * 2);
+  }
+  if (timer > 300) {
+    //initiate ball 4
+    fill(0, 255, 0);
+    circle(ball4X, ball4Y, radius * 2);
+  }
+  if (timer > 400) {
+    //initiate ball 5
+    fill(255, 0, 255);
+    circle(ball5X, ball5Y, radius * 2);
+  }
 }
 
 function mousePressed() {
-  //circleX = 0;
-  directionX = directionX * -1;
+  //mousePressed
 }
-
-setInterval(function () {
-  console.log("This runs every second");
-  fill(random(255), random(255), random(255));
-}, 1000);
