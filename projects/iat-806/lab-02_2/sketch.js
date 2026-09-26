@@ -16,8 +16,14 @@ let playerX,
   playerRadius = 50;
 let timer = 0;
 let gameOver = false;
+let backgroundImage;
+let playerImage;
+let ballImage;
 
-function setup() {
+async function setup() {
+  backgroundImage = await loadImage("background.png");
+  playerImage = await loadImage("player.jpg");
+  ballImage = await loadImage("ball.jpg");
   const canvas = createCanvas(800, 800);
   canvas.parent("sketch-holder");
   ball1X = ball2X = ball3X = ball4X = ball5X = width / 2;
@@ -29,7 +35,9 @@ function setup() {
 
 function draw() {
   if (gameOver) {
-    background(0);
+    tint(110);
+    image(backgroundImage, 0, 0, width, height);
+    noTint();
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(52);
@@ -43,8 +51,10 @@ function draw() {
   timer = timer + 1;
   //console.log(timer);
 
-  //draw background
-  background(20);
+  // Draw a dimmed image so the game elements remain easy to see.
+  tint(110);
+  image(backgroundImage, 0, 0, width, height);
+  noTint();
 
   if (playerRadius < 30) {
     gameOver = true;
@@ -104,8 +114,23 @@ function draw() {
   }
 
   // draw player
-  fill(255, 255, 255);
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.arc(playerX, playerY, playerRadius, 0, TWO_PI);
+  drawingContext.clip();
+  image(
+    playerImage,
+    playerX - playerRadius,
+    playerY - playerRadius,
+    playerRadius * 2,
+    playerRadius * 2,
+  );
+  drawingContext.restore();
+  noFill();
+  stroke(255);
+  strokeWeight(3);
   circle(playerX, playerY, playerRadius * 2);
+  noStroke();
   playerX = mouseX;
   playerY = mouseY;
 
@@ -289,30 +314,36 @@ function draw() {
 
   //initiate balls
   if (timer > 0) {
-    //initiate ball 1
-    fill(255, 0, 0);
-    circle(ball1X, ball1Y, radius * 2);
+    drawTexturedBall(ball1X, ball1Y, 255, 0, 0);
   }
   if (timer > 100) {
-    //initiate ball 2
-    fill(0, 0, 255);
-    circle(ball2X, ball2Y, radius * 2);
+    drawTexturedBall(ball2X, ball2Y, 0, 0, 255);
   }
   if (timer > 200) {
-    //initiate ball 3
-    fill(255, 255, 0);
-    circle(ball3X, ball3Y, radius * 2);
+    drawTexturedBall(ball3X, ball3Y, 255, 255, 0);
   }
   if (timer > 300) {
-    //initiate ball 4
-    fill(0, 255, 0);
-    circle(ball4X, ball4Y, radius * 2);
+    drawTexturedBall(ball4X, ball4Y, 0, 255, 0);
   }
   if (timer > 400) {
-    //initiate ball 5
-    fill(255, 0, 255);
-    circle(ball5X, ball5Y, radius * 2);
+    drawTexturedBall(ball5X, ball5Y, 255, 0, 255);
   }
+}
+
+function drawTexturedBall(x, y, redValue, greenValue, blueValue) {
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.arc(x, y, radius, 0, TWO_PI);
+  drawingContext.clip();
+  tint(redValue, greenValue, blueValue);
+  image(ballImage, x - radius, y - radius, radius * 2, radius * 2);
+  noTint();
+  drawingContext.restore();
+  noFill();
+  stroke(redValue, greenValue, blueValue);
+  strokeWeight(3);
+  circle(x, y, radius * 2);
+  noStroke();
 }
 
 function mousePressed() {
