@@ -9,6 +9,8 @@ let speed1Y, speed2Y, speed3Y, speed4Y, speed5Y;
 let minSpeed = 3;
 let maxSpeed = 10;
 let radius = 50;
+let scoreMultiplier = 0.1;
+let score;
 let playerX,
   playerY,
   playerRadius = 50;
@@ -21,6 +23,7 @@ function setup() {
   ball1Y = ball2Y = ball3Y = ball4Y = ball5Y = height / 2;
   speed1X = speed2X = speed3X = speed4X = speed5X = 5;
   speed1Y = speed2Y = speed3Y = speed4Y = speed5Y = 5;
+  score = 0;
 }
 
 function draw() {
@@ -50,16 +53,34 @@ function draw() {
   let distance4 = dist(playerX, playerY, ball4X, ball4Y);
   let distance5 = dist(playerX, playerY, ball5X, ball5Y);
 
-  //increase and decrease player ball radius based on distance to other balls
   //increase player radius gradually if the distance is more than the sum of the radii of the player and the ball
   if (
-    (distance1 > playerRadius + radius) & (distance2 > playerRadius + radius) &&
+    distance1 > playerRadius + radius &&
+    distance2 > playerRadius + radius &&
     distance3 > playerRadius + radius &&
     distance4 > playerRadius + radius &&
     distance5 > playerRadius + radius
   ) {
-    playerRadius = playerRadius + 0.5;
+    playerRadius = playerRadius + 0.3;
   }
+  //decrease player radius gradually if the distance is less than the sum of the radii of the player and the ball
+  if (
+    distance1 < playerRadius + radius ||
+    distance2 < playerRadius + radius ||
+    distance3 < playerRadius + radius ||
+    distance4 < playerRadius + radius ||
+    distance5 < playerRadius + radius
+  ) {
+    playerRadius = playerRadius - 1;
+  }
+
+  //score based on time * player, additively
+  let scoreAdd = playerRadius * scoreMultiplier;
+  score = score + scoreAdd;
+  fill(255);
+  textSize(32);
+  textAlign(RIGHT, TOP);
+  text("Score: " + int(score), width - 20, 20);
 
   // draw player
   fill(255, 255, 255);
