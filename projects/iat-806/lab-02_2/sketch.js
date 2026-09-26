@@ -15,6 +15,7 @@ let playerX,
   playerY,
   playerRadius = 50;
 let timer = 0;
+let gameOver = false;
 
 function setup() {
   const canvas = createCanvas(800, 800);
@@ -27,12 +28,28 @@ function setup() {
 }
 
 function draw() {
+  if (gameOver) {
+    background(0);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(52);
+    text("Game Over", width / 2, height / 2 - 25);
+    textSize(36);
+    text("Score: " + int(score), width / 2, height / 2 + 35);
+    return;
+  }
+
   //frame count
   timer = timer + 1;
   //console.log(timer);
 
   //draw background
   background(20);
+
+  if (playerRadius < 30) {
+    gameOver = true;
+    return;
+  }
 
   // move
   ball1X = ball1X + speed1X;
@@ -71,7 +88,7 @@ function draw() {
     distance4 < playerRadius + radius ||
     distance5 < playerRadius + radius
   ) {
-    playerRadius = playerRadius - 1;
+    playerRadius = playerRadius - 1 * (timer / 500);
   }
 
   //score based on time * player, additively
@@ -81,6 +98,10 @@ function draw() {
   textSize(32);
   textAlign(RIGHT, TOP);
   text("Score: " + int(score), width - 20, 20);
+
+  if (playerRadius < 30) {
+    gameOver = true;
+  }
 
   // draw player
   fill(255, 255, 255);
