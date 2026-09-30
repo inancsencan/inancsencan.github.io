@@ -1,5 +1,7 @@
 let axiom = "F";
 let currentString = axiom;
+let angle = 60;
+let segmentLength = 10;
 
 const rules = {
   F: "F+F-F",
@@ -24,13 +26,47 @@ function generateNextIteration() {
   currentString = nextString;
 }
 
-console.log("Iteration 0:", currentString);
+function generate(iterations) {
+  currentString = axiom;
 
-generateNextIteration();
-console.log("Iteration 1:", currentString);
+  console.log("Iteration 0:", currentString);
 
-generateNextIteration();
-console.log("Iteration 2:", currentString);
+  for (let i = 1; i <= iterations; i++) {
+    generateNextIteration();
+    console.log(`Iteration ${i}:`, currentString);
+  }
+}
 
-generateNextIteration();
-console.log("Iteration 3:", currentString);
+function setup() {
+  const canvas = createCanvas(800, 600);
+  canvas.parent("sketch-holder");
+
+  background(0);
+  stroke(255);
+  strokeWeight(2);
+
+  generate(4);
+
+  drawLSystem(currentString);
+}
+
+function drawLSystem(sequence) {
+  translate(width / 2, height / 2);
+
+  for (let i = 0; i < sequence.length; i++) {
+    let symbol = sequence[i];
+
+    if (symbol === "F") {
+      line(0, 0, segmentLength, 0);
+      translate(segmentLength, 0);
+    }
+
+    if (symbol === "+") {
+      rotate(radians(angle));
+    }
+
+    if (symbol === "-") {
+      rotate(radians(-angle));
+    }
+  }
+}
