@@ -1,11 +1,12 @@
-let axiom = "F";
-let currentString = axiom;
+let axiom = "F--F--F";
 let angle = 60;
-let segmentLength = 10;
+let segmentLength = 5;
 
 const rules = {
-  F: "F+F-F",
+  F: "F+F--F+F",
 };
+
+let currentString = axiom;
 
 function applyRule(character) {
   if (rules[character]) {
