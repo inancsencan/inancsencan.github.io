@@ -1,29 +1,25 @@
-let axiom = "F--F--F";
-let angle = 60;
-let segmentLength = 5;
+let axiom = "F";
 
 const rules = {
-  F: "F+F--F+F",
+  F: "F+F-F",
 };
 
 let currentString = axiom;
 
-// Playback
-let playbackIndex = 0;
-let isPlaying = false;
-let playbackStartTime = 0;
-let playbackDuration = 5000;
+let iterations = 4;
 
-// Pitch
-let basePitch = 60;
-let playbackPitch = basePitch;
-let pitchStep = 2;
+let baselineY;
+let leftMargin = 80;
+let rightMargin = 80;
 
-// Debug
-let showDebugCircles = false;
+let fakeAmplitude = 80;
+let waveSpeed = 0.04;
+
+let history = [];
+let maxHistory = 28;
 
 // -------------------------
-// L-SYSTEM GENERATION
+// L-SYSTEM
 // -------------------------
 
 function applyRule(character) {
@@ -38,226 +34,163 @@ function generateNextIteration() {
   let nextString = "";
 
   for (let i = 0; i < currentString.length; i++) {
-    let currentCharacter = currentString[i];
-    nextString += applyRule(currentCharacter);
+    nextString += applyRule(currentString[i]);
   }
 
   currentString = nextString;
 }
 
-function generate(iterations) {
+function generate(iterationCount) {
   currentString = axiom;
 
-  console.log("Iteration 0:", currentString);
-
-  for (let i = 1; i <= iterations; i++) {
+  for (let i = 0; i < iterationCount; i++) {
     generateNextIteration();
-    console.log(`Iteration ${i}:`, currentString);
   }
 
-  console.log("Sequence length:", currentString.length);
+  console.log(currentString);
 }
 
 // -------------------------
-// P5 SETUP
+// P5
 // -------------------------
 
 function setup() {
-  const canvas = createCanvas(800, 600);
+  const canvas = createCanvas(900, 600);
   canvas.parent("sketch-holder");
 
   colorMode(HSB, 360, 100, 100, 1);
-  background(0);
 
-  generate(2);
-}
+  baselineY = height / 2;
 
-// -------------------------
-// PLAYBACK
-// -------------------------
-
-async function startPlayback() {
-  await userStartAudio();
-
-  playbackIndex = 0;
-  playbackStartTime = millis();
-  playbackPitch = basePitch;
-  isPlaying = true;
-
-  console.log("Playback started");
+  generate(iterations);
 }
 
 function draw() {
-  if (isPlaying) {
-    let elapsed = millis() - playbackStartTime;
-    let progress = elapsed / playbackDuration;
-    progress = constrain(progress, 0, 1);
-
-    let targetIndex = floor(progress * currentString.length);
-
-    while (
-      playbackIndex < targetIndex &&
-      playbackIndex < currentString.length
-    ) {
-      processAudioSymbol(currentString[playbackIndex]);
-      playbackIndex++;
-    }
-
-    if (elapsed >= playbackDuration) {
-      isPlaying = false;
-      console.log("Playback finished");
-    }
-  }
-
-  renderVisualState(playbackIndex);
-}
-
-// -------------------------
-// AUDIO PROCESSING
-// -------------------------
-
-function processAudioSymbol(symbol) {
-  if (symbol === "F") {
-    playNote(playbackPitch);
-  }
-
-  if (symbol === "+") {
-    playbackPitch += pitchStep;
-  }
-
-  if (symbol === "-") {
-    playbackPitch -= pitchStep;
-  }
-}
-
-function playNote(midiPitch) {
-  const audioContext = getAudioContext();
-
-  const noteOscillator = audioContext.createOscillator();
-  const noteGain = audioContext.createGain();
-
-  noteOscillator.type = "sine";
-  noteOscillator.frequency.value = midiToFrequency(midiPitch);
-
-  noteOscillator.connect(noteGain);
-  noteGain.connect(audioContext.destination);
-
-  const now = audioContext.currentTime;
-
-  noteGain.gain.setValueAtTime(0, now);
-  noteGain.gain.linearRampToValueAtTime(0.15, now + 0.01);
-  noteGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-
-  noteOscillator.start(now);
-  noteOscillator.stop(now + 0.1);
-}
-
-function midiToFrequency(midiNote) {
-  return 440 * Math.pow(2, (midiNote - 69) / 12);
-}
-
-// -------------------------
-// VISUAL RENDERING
-// -------------------------
-
-function renderVisualState(symbolCount) {
   background(0);
 
-  let x = width / 2;
-  let y = height / 2;
-  let heading = 0;
-  let renderPitch = basePitch;
-  let debugCount = 0;
+  let points = buildSignalLine();
 
-  for (let i = 0; i < symbolCount; i++) {
+  saveHistory(points);
+
+  drawHistory();
+  drawSignalLine(points);
+}
+
+// -------------------------
+// SIGNAL LINE
+// -------------------------
+
+function buildSignalLine() {
+  let points = [];
+
+  let drawableWidth = width - leftMargin - rightMargin;
+
+  let fCount = 0;
+
+  for (let i = 0; i < currentString.length; i++) {
+    if (currentString[i] === "F") {
+      fCount++;
+    }
+  }
+
+  let xStep = drawableWidth / max(1, fCount - 1);
+
+  let x = leftMargin;
+  let phaseOffset = 0;
+
+  for (let i = 0; i < currentString.length; i++) {
     let symbol = currentString[i];
 
-    if (symbol === "F") {
-      let nextX = x + cos(radians(heading)) * segmentLength;
-
-      let nextY = y + sin(radians(heading)) * segmentLength;
-
-      let hueValue = pitchToHue(renderPitch);
-
-      push();
-      stroke(hueValue, 80, 100);
-      strokeWeight(2);
-      line(x, y, nextX, nextY);
-      pop();
-
-      x = nextX;
-      y = nextY;
-
-      debugCount++;
-
-      if (showDebugCircles) {
-        drawDebugCircle(debugCount);
-      }
-    }
-
     if (symbol === "+") {
-      heading += angle;
-      renderPitch += pitchStep;
+      phaseOffset += 0.8;
     }
 
     if (symbol === "-") {
-      heading -= angle;
-      renderPitch -= pitchStep;
+      phaseOffset -= 0.8;
+    }
+
+    if (symbol === "F") {
+      let wave = sin(frameCount * waveSpeed + phaseOffset) * fakeAmplitude;
+
+      points.push({
+        x: x,
+        y: baselineY + wave,
+      });
+
+      x += xStep;
     }
   }
-}
 
-function pitchToHue(midiPitch) {
-  let constrainedPitch = constrain(midiPitch, 48, 84);
-  return map(constrainedPitch, 48, 84, 180, 330);
+  return points;
 }
 
 // -------------------------
-// DEBUG CIRCLES
+// DRAW CURRENT LINE
 // -------------------------
 
-function drawDebugCircle(index) {
-  let spacing = 12;
-  let startX = 20;
-  let startY = 20;
-  let diameter = 6;
+function drawSignalLine(points) {
+  noFill();
 
-  let maxColumns = floor((width - 40) / spacing);
-  maxColumns = max(1, maxColumns);
+  stroke(190, 80, 100);
+  strokeWeight(3);
 
-  let zeroBasedIndex = index - 1;
-  let column = zeroBasedIndex % maxColumns;
-  let row = floor(zeroBasedIndex / maxColumns);
+  beginShape();
 
-  let x = startX + column * spacing;
-  let y = startY + row * spacing;
-
-  push();
-  noStroke();
-  fill(0, 100, 100);
-  circle(x, y, diameter);
-  pop();
-}
-
-// -------------------------
-// CONTROLS
-// -------------------------
-
-function keyPressed() {
-  if (key === " ") {
-    startPlayback();
-    return false;
+  for (let point of points) {
+    vertex(point.x, point.y);
   }
 
-  if (key === "c" || key === "C") {
-    showDebugCircles = true;
-    return false;
+  endShape();
+}
+
+// -------------------------
+// HISTORY / FADE
+// -------------------------
+
+function saveHistory(points) {
+  let snapshot = [];
+
+  for (let point of points) {
+    snapshot.push({
+      x: point.x,
+      y: point.y,
+    });
+  }
+
+  history.unshift(snapshot);
+
+  if (history.length > maxHistory) {
+    history.pop();
   }
 }
 
-function keyReleased() {
-  if (key === "c" || key === "C") {
-    showDebugCircles = false;
-    return false;
+function drawHistory() {
+  for (let i = 0; i < history.length; i++) {
+    let points = history[i];
+
+    let alpha = map(i, 0, maxHistory, 0.35, 0);
+
+    let verticalOffset = i * 4;
+
+    // Upper echo
+    drawEcho(points, -verticalOffset, alpha);
+
+    // Lower echo
+    drawEcho(points, verticalOffset, alpha);
   }
+}
+
+function drawEcho(points, yOffset, alpha) {
+  noFill();
+
+  stroke(220, 60, 100, alpha);
+  strokeWeight(1);
+
+  beginShape();
+
+  for (let point of points) {
+    vertex(point.x, point.y + yOffset);
+  }
+
+  endShape();
 }
