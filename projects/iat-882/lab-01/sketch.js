@@ -14,13 +14,13 @@ let isPlaying = false;
 let playbackStartTime = 0;
 let playbackDuration = 5000;
 
-// Turtle
-let turtleX = 0;
-let turtleY = 0;
-let turtleAngle = 0;
+// Pitch
+let basePitch = 60;
+let playbackPitch = basePitch;
+let pitchStep = 2;
 
 // Debug
-let noteDebugCount = 0;
+let showDebugCircles = false;
 
 // -------------------------
 // L-SYSTEM GENERATION
@@ -66,25 +66,10 @@ function setup() {
   const canvas = createCanvas(800, 600);
   canvas.parent("sketch-holder");
 
+  colorMode(HSB, 360, 100, 100, 1);
   background(0);
 
-  stroke(255);
-  strokeWeight(2);
-
-  // Keep this at 2 while debugging sound.
   generate(2);
-
-  resetTurtle();
-}
-
-// -------------------------
-// TURTLE
-// -------------------------
-
-function resetTurtle() {
-  turtleX = width / 2;
-  turtleY = height / 2;
-  turtleAngle = 0;
 }
 
 // -------------------------
@@ -94,99 +79,65 @@ function resetTurtle() {
 async function startPlayback() {
   await userStartAudio();
 
-  background(0);
-
-  noteDebugCount = 0;
   playbackIndex = 0;
   playbackStartTime = millis();
+  playbackPitch = basePitch;
   isPlaying = true;
 
-  resetTurtle();
+  console.log("Playback started");
 }
 
 function draw() {
-  if (!isPlaying) {
-    return;
+  if (isPlaying) {
+    let elapsed = millis() - playbackStartTime;
+    let progress = elapsed / playbackDuration;
+    progress = constrain(progress, 0, 1);
+
+    let targetIndex = floor(progress * currentString.length);
+
+    while (
+      playbackIndex < targetIndex &&
+      playbackIndex < currentString.length
+    ) {
+      processAudioSymbol(currentString[playbackIndex]);
+      playbackIndex++;
+    }
+
+    if (elapsed >= playbackDuration) {
+      isPlaying = false;
+      console.log("Playback finished");
+    }
   }
 
-  let elapsed = millis() - playbackStartTime;
-  let progress = elapsed / playbackDuration;
-
-  // Prevent progress from going beyond 1.
-  progress = constrain(progress, 0, 1);
-
-  let targetIndex = floor(progress * currentString.length);
-
-  while (playbackIndex < targetIndex && playbackIndex < currentString.length) {
-    let symbol = currentString[playbackIndex];
-
-    processSymbol(symbol);
-
-    playbackIndex++;
-  }
-
-  if (elapsed >= playbackDuration) {
-    isPlaying = false;
-
-    console.log("Playback finished");
-  }
+  renderVisualState(playbackIndex);
 }
 
 // -------------------------
-// SYMBOL INTERPRETATION
+// AUDIO PROCESSING
 // -------------------------
 
-function processSymbol(symbol) {
+function processAudioSymbol(symbol) {
   if (symbol === "F") {
-    let nextX = turtleX + cos(radians(turtleAngle)) * segmentLength;
-
-    let nextY = turtleY + sin(radians(turtleAngle)) * segmentLength;
-
-    // Draw the segment.
-    push();
-    stroke(255);
-    strokeWeight(2);
-    line(turtleX, turtleY, nextX, nextY);
-    pop();
-
-    turtleX = nextX;
-    turtleY = nextY;
-
-    // Same event also produces sound.
-    playNote();
+    playNote(playbackPitch);
   }
 
   if (symbol === "+") {
-    turtleAngle += angle;
+    playbackPitch += pitchStep;
   }
 
   if (symbol === "-") {
-    turtleAngle -= angle;
+    playbackPitch -= pitchStep;
   }
 }
 
-// -------------------------
-// SOUND
-// -------------------------
-
-function playNote() {
-  noteDebugCount++;
-
-  // Visual debug
-  push();
-  fill(255, 0, 0);
-  noStroke();
-  circle(20 + noteDebugCount * 12, 20, 6);
-  pop();
-
-  // Audio
+function playNote(midiPitch) {
   const audioContext = getAudioContext();
 
   const noteOscillator = audioContext.createOscillator();
   const noteGain = audioContext.createGain();
 
   noteOscillator.type = "sine";
-  noteOscillator.frequency.value = 220;
+  noteOscillator.frequency.value = midiToFrequency(midiPitch);
 
   noteOscillator.connect(noteGain);
   noteGain.connect(audioContext.destination);
@@ -201,6 +152,93 @@ function playNote() {
   noteOscillator.stop(now + 0.1);
 }
 
+function midiToFrequency(midiNote) {
+  return 440 * Math.pow(2, (midiNote - 69) / 12);
+}
+
+// -------------------------
+// VISUAL RENDERING
+// -------------------------
+
+function renderVisualState(symbolCount) {
+  background(0);
+
+  let x = width / 2;
+  let y = height / 2;
+  let heading = 0;
+  let renderPitch = basePitch;
+  let debugCount = 0;
+
+  for (let i = 0; i < symbolCount; i++) {
+    let symbol = currentString[i];
+
+    if (symbol === "F") {
+      let nextX = x + cos(radians(heading)) * segmentLength;
+
+      let nextY = y + sin(radians(heading)) * segmentLength;
+
+      let hueValue = pitchToHue(renderPitch);
+
+      push();
+      stroke(hueValue, 80, 100);
+      strokeWeight(2);
+      line(x, y, nextX, nextY);
+      pop();
+
+      x = nextX;
+      y = nextY;
+
+      debugCount++;
+
+      if (showDebugCircles) {
+        drawDebugCircle(debugCount);
+      }
+    }
+
+    if (symbol === "+") {
+      heading += angle;
+      renderPitch += pitchStep;
+    }
+
+    if (symbol === "-") {
+      heading -= angle;
+      renderPitch -= pitchStep;
+    }
+  }
+}
+
+function pitchToHue(midiPitch) {
+  let constrainedPitch = constrain(midiPitch, 48, 84);
+  return map(constrainedPitch, 48, 84, 180, 330);
+}
+
+// -------------------------
+// DEBUG CIRCLES
+// -------------------------
+
+function drawDebugCircle(index) {
+  let spacing = 12;
+  let startX = 20;
+  let startY = 20;
+  let diameter = 6;
+
+  let maxColumns = floor((width - 40) / spacing);
+  maxColumns = max(1, maxColumns);
+
+  let zeroBasedIndex = index - 1;
+  let column = zeroBasedIndex % maxColumns;
+  let row = floor(zeroBasedIndex / maxColumns);
+
+  let x = startX + column * spacing;
+  let y = startY + row * spacing;
+
+  push();
+  noStroke();
+  fill(0, 100, 100);
+  circle(x, y, diameter);
+  pop();
+}
+
 // -------------------------
 // CONTROLS
 // -------------------------
@@ -208,8 +246,18 @@ function playNote() {
 function keyPressed() {
   if (key === " ") {
     startPlayback();
+    return false;
+  }
 
-    // Prevent Space from scrolling the webpage.
+  if (key === "c" || key === "C") {
+    showDebugCircles = true;
+    return false;
+  }
+}
+
+function keyReleased() {
+  if (key === "c" || key === "C") {
+    showDebugCircles = false;
     return false;
   }
 }
