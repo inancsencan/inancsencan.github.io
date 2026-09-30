@@ -1,152 +1,212 @@
-let axiom = "F";
+// -------------------------
+// CONFIG
+// -------------------------
 
-const rules = {
-  F: "F+F-F",
-};
+let initialLength = 32;
+let currentString = "";
 
-let currentString = axiom;
-
-let iterations = 4;
+let generationCount = 0;
+let generationInterval = 300; // ms
+let lastGenerationTime = 0;
 
 let baselineY;
-let leftMargin = 80;
-let rightMargin = 80;
-
-let fakeAmplitude = 80;
-let waveSpeed = 0.04;
 
 let history = [];
-let maxHistory = 28;
+let maxHistory = 20;
+let historySpacing = 7;
+
+let amplitudeScale = 18;
+let maxVerticalOffset = 180;
+
+let isPaused = false;
 
 // -------------------------
-// L-SYSTEM
+// STOCHASTIC RULES
 // -------------------------
 
-function applyRule(character) {
-  if (rules[character]) {
-    return rules[character];
-  }
+const rules = {
+  A: [
+    { symbol: "A", weight: 0.5 },
+    { symbol: "B", weight: 0.2 },
+    { symbol: "C", weight: 0.2 },
+    { symbol: "D", weight: 0.1 },
+  ],
 
-  return character;
-}
+  B: [
+    { symbol: "B", weight: 0.35 },
+    { symbol: "A", weight: 0.35 },
+    { symbol: "D", weight: 0.15 },
+    { symbol: "C", weight: 0.15 },
+  ],
 
-function generateNextIteration() {
-  let nextString = "";
+  C: [
+    { symbol: "C", weight: 0.35 },
+    { symbol: "A", weight: 0.35 },
+    { symbol: "D", weight: 0.15 },
+    { symbol: "B", weight: 0.15 },
+  ],
 
-  for (let i = 0; i < currentString.length; i++) {
-    nextString += applyRule(currentString[i]);
-  }
-
-  currentString = nextString;
-}
-
-function generate(iterationCount) {
-  currentString = axiom;
-
-  for (let i = 0; i < iterationCount; i++) {
-    generateNextIteration();
-  }
-
-  console.log(currentString);
-}
+  D: [
+    { symbol: "A", weight: 0.45 },
+    { symbol: "D", weight: 0.35 },
+    { symbol: "B", weight: 0.1 },
+    { symbol: "C", weight: 0.1 },
+  ],
+};
 
 // -------------------------
-// P5
+// SETUP
 // -------------------------
 
 function setup() {
   const canvas = createCanvas(900, 600);
   canvas.parent("sketch-holder");
 
-  colorMode(HSB, 360, 100, 100, 1);
-
   baselineY = height / 2;
 
-  generate(iterations);
+  initializeString();
+
+  let initialPoints = buildLineFromString(currentString);
+  saveHistory(initialPoints);
+
+  lastGenerationTime = millis();
+
+  console.log("Initial string:", currentString);
 }
+
+function initializeString() {
+  history = [];
+  currentString = "";
+
+  for (let i = 0; i < initialLength; i++) {
+    currentString += "A";
+  }
+
+  generationCount = 0;
+}
+
+// -------------------------
+// DRAW LOOP
+// -------------------------
 
 function draw() {
   background(0);
 
-  let points = buildSignalLine();
-
-  saveHistory(points);
-
-  drawHistory();
-  drawSignalLine(points);
-}
-
-// -------------------------
-// SIGNAL LINE
-// -------------------------
-
-function buildSignalLine() {
-  let points = [];
-
-  let drawableWidth = width - leftMargin - rightMargin;
-
-  let fCount = 0;
-
-  for (let i = 0; i < currentString.length; i++) {
-    if (currentString[i] === "F") {
-      fCount++;
+  if (!isPaused) {
+    if (millis() - lastGenerationTime >= generationInterval) {
+      generateNextGeneration();
+      lastGenerationTime = millis();
     }
   }
 
-  let xStep = drawableWidth / max(1, fCount - 1);
+  drawBaseline();
+  drawHistory();
 
-  let x = leftMargin;
-  let phaseOffset = 0;
+  if (history.length > 0) {
+    drawSignalLine(history[0]);
+  }
+
+  drawHUD();
+}
+
+// -------------------------
+// GENERATION
+// -------------------------
+
+function generateNextGeneration() {
+  let nextString = "";
 
   for (let i = 0; i < currentString.length; i++) {
-    let symbol = currentString[i];
+    let currentSymbol = currentString[i];
+    nextString += rewriteSymbol(currentSymbol);
+  }
 
-    if (symbol === "+") {
-      phaseOffset += 0.8;
+  currentString = nextString;
+  generationCount++;
+
+  let points = buildLineFromString(currentString);
+  saveHistory(points);
+
+  console.log("Generation", generationCount, currentString);
+}
+
+function rewriteSymbol(symbol) {
+  let options = rules[symbol];
+
+  if (!options) {
+    return symbol;
+  }
+
+  return weightedChoice(options);
+}
+
+function weightedChoice(options) {
+  let totalWeight = 0;
+
+  for (let option of options) {
+    totalWeight += option.weight;
+  }
+
+  let r = random(totalWeight);
+  let runningSum = 0;
+
+  for (let option of options) {
+    runningSum += option.weight;
+
+    if (r <= runningSum) {
+      return option.symbol;
+    }
+  }
+
+  // fallback
+  return options[options.length - 1].symbol;
+}
+
+// -------------------------
+// STRING -> LINE
+// -------------------------
+
+function buildLineFromString(sequence) {
+  let points = [];
+
+  let xStep = width / max(1, sequence.length - 1);
+
+  let currentY = baselineY;
+
+  for (let i = 0; i < sequence.length; i++) {
+    let symbol = sequence[i];
+
+    let targetY = baselineY;
+
+    if (symbol === "B") {
+      targetY = baselineY - 90;
     }
 
-    if (symbol === "-") {
-      phaseOffset -= 0.8;
+    if (symbol === "C") {
+      targetY = baselineY + 90;
     }
 
-    if (symbol === "F") {
-      let wave = sin(frameCount * waveSpeed + phaseOffset) * fakeAmplitude;
-
-      points.push({
-        x: x,
-        y: baselineY + wave,
-      });
-
-      x += xStep;
+    if (symbol === "D") {
+      targetY = baselineY + 25;
     }
+
+    if (symbol === "A") {
+      targetY = baselineY;
+    }
+
+    currentY = lerp(currentY, targetY, 0.65);
+
+    points.push({
+      x: i * xStep,
+      y: currentY,
+      symbol: symbol,
+    });
   }
 
   return points;
 }
 
-// -------------------------
-// DRAW CURRENT LINE
-// -------------------------
-
-function drawSignalLine(points) {
-  noFill();
-
-  stroke(190, 80, 100);
-  strokeWeight(3);
-
-  beginShape();
-
-  for (let point of points) {
-    vertex(point.x, point.y);
-  }
-
-  endShape();
-}
-
-// -------------------------
-// HISTORY / FADE
-// -------------------------
-
+//save history
 function saveHistory(points) {
   let snapshot = [];
 
@@ -154,6 +214,7 @@ function saveHistory(points) {
     snapshot.push({
       x: point.x,
       y: point.y,
+      symbol: point.symbol,
     });
   }
 
@@ -164,26 +225,27 @@ function saveHistory(points) {
   }
 }
 
+//draw history
 function drawHistory() {
-  for (let i = 0; i < history.length; i++) {
+  for (let i = 1; i < history.length; i++) {
     let points = history[i];
 
-    let alpha = map(i, 0, maxHistory, 0.35, 0);
+    let alpha = map(i, 1, maxHistory, 90, 0);
 
-    let verticalOffset = i * 4;
+    let offset = i * historySpacing;
 
-    // Upper echo
-    drawEcho(points, -verticalOffset, alpha);
-
-    // Lower echo
-    drawEcho(points, verticalOffset, alpha);
+    drawHistoryLine(points, -offset, alpha);
+    drawHistoryLine(points, offset, alpha);
   }
 }
 
-function drawEcho(points, yOffset, alpha) {
-  noFill();
+function drawHistoryLine(points, yOffset, alpha) {
+  if (points.length < 2) return;
 
-  stroke(220, 60, 100, alpha);
+  push();
+
+  noFill();
+  stroke(60, 140, 180, alpha);
   strokeWeight(1);
 
   beginShape();
@@ -193,4 +255,99 @@ function drawEcho(points, yOffset, alpha) {
   }
 
   endShape();
+
+  pop();
+}
+
+function getInfluence(symbol) {
+  if (symbol === "A") return 0.0;
+  if (symbol === "B") return -0.9;
+  if (symbol === "C") return 0.9;
+  if (symbol === "D") return 0.0;
+
+  return 0.0;
+}
+
+function getDamping(symbol) {
+  if (symbol === "A") return 0.92;
+  if (symbol === "B") return 0.94;
+  if (symbol === "C") return 0.94;
+  if (symbol === "D") return 0.72;
+
+  return 0.9;
+}
+
+// -------------------------
+// DRAWING
+// -------------------------
+
+function drawBaseline() {
+  push();
+
+  stroke(50);
+  strokeWeight(1);
+
+  line(0, baselineY, width, baselineY);
+
+  pop();
+}
+
+function drawSignalLine(points) {
+  if (points.length < 2) return;
+
+  push();
+
+  noFill();
+  stroke(0, 255, 255);
+  strokeWeight(3);
+
+  beginShape();
+
+  for (let point of points) {
+    vertex(point.x, point.y);
+  }
+
+  endShape();
+
+  pop();
+}
+
+// -------------------------
+// HUD / DEBUG
+// -------------------------
+
+function drawHUD() {
+  push();
+
+  fill(255);
+  noStroke();
+  textSize(16);
+
+  text("Generation: " + generationCount, 20, 30);
+  text("Length: " + currentString.length, 20, 55);
+  text(currentString, 20, 80);
+
+  pop();
+}
+
+// -------------------------
+// CONTROLS
+// -------------------------
+
+function keyPressed() {
+  if (key === " ") {
+    isPaused = !isPaused;
+    return false;
+  }
+
+  if (key === "r" || key === "R") {
+    initializeString();
+
+    let initialPoints = buildLineFromString(currentString);
+    saveHistory(initialPoints);
+
+    lastGenerationTime = millis();
+
+    return false;
+  }
 }
