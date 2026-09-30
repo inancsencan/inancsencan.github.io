@@ -12,11 +12,11 @@ let lastGenerationTime = 0;
 let baselineY;
 
 let history = [];
-let maxHistory = 20;
-let historySpacing = 7;
+let maxHistory = 16;
+let historySpacing = 14;
 
-let amplitudeScale = 18;
-let maxVerticalOffset = 180;
+let previousPoints = [];
+let targetPoints = [];
 
 let isPaused = false;
 
@@ -67,12 +67,20 @@ function setup() {
   initializeString();
 
   let initialPoints = buildLineFromString(currentString);
+
+  previousPoints = copyPoints(initialPoints);
+  targetPoints = copyPoints(initialPoints);
+
   saveHistory(initialPoints);
 
   lastGenerationTime = millis();
 
   console.log("Initial string:", currentString);
 }
+
+// -------------------------
+// INITIAL STRING
+// -------------------------
 
 function initializeString() {
   history = [];
@@ -102,8 +110,21 @@ function draw() {
   drawBaseline();
   drawHistory();
 
-  if (history.length > 0) {
-    drawSignalLine(history[0]);
+  if (previousPoints.length > 0 && targetPoints.length > 0) {
+    let transitionProgress =
+      (millis() - lastGenerationTime) / generationInterval;
+
+    transitionProgress = constrain(transitionProgress, 0, 1);
+
+    transitionProgress = smoothStep(transitionProgress);
+
+    let displayPoints = interpolatePoints(
+      previousPoints,
+      targetPoints,
+      transitionProgress,
+    );
+
+    drawSignalLine(displayPoints);
   }
 
   drawHUD();
@@ -118,17 +139,25 @@ function generateNextGeneration() {
 
   for (let i = 0; i < currentString.length; i++) {
     let currentSymbol = currentString[i];
+
     nextString += rewriteSymbol(currentSymbol);
   }
 
   currentString = nextString;
   generationCount++;
 
-  let points = buildLineFromString(currentString);
-  saveHistory(points);
+  previousPoints = copyPoints(targetPoints);
+
+  targetPoints = buildLineFromString(currentString);
+
+  saveHistory(targetPoints);
 
   console.log("Generation", generationCount, currentString);
 }
+
+// -------------------------
+// REWRITE
+// -------------------------
 
 function rewriteSymbol(symbol) {
   let options = rules[symbol];
@@ -158,7 +187,6 @@ function weightedChoice(options) {
     }
   }
 
-  // fallback
   return options[options.length - 1].symbol;
 }
 
@@ -178,6 +206,10 @@ function buildLineFromString(sequence) {
 
     let targetY = baselineY;
 
+    if (symbol === "A") {
+      targetY = baselineY;
+    }
+
     if (symbol === "B") {
       targetY = baselineY - 90;
     }
@@ -188,10 +220,6 @@ function buildLineFromString(sequence) {
 
     if (symbol === "D") {
       targetY = baselineY + 25;
-    }
-
-    if (symbol === "A") {
-      targetY = baselineY;
     }
 
     currentY = lerp(currentY, targetY, 0.65);
@@ -206,17 +234,102 @@ function buildLineFromString(sequence) {
   return points;
 }
 
-//save history
-function saveHistory(points) {
-  let snapshot = [];
+// -------------------------
+// GENERATION INTERPOLATION
+// -------------------------
+
+function interpolatePoints(fromPoints, toPoints, amount) {
+  let result = [];
+
+  let count = min(fromPoints.length, toPoints.length);
+
+  for (let i = 0; i < count; i++) {
+    result.push({
+      x: lerp(fromPoints[i].x, toPoints[i].x, amount),
+
+      y: lerp(fromPoints[i].y, toPoints[i].y, amount),
+    });
+  }
+
+  return result;
+}
+
+function smoothStep(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// -------------------------
+// COPY POINTS
+// -------------------------
+
+function copyPoints(points) {
+  let result = [];
 
   for (let point of points) {
-    snapshot.push({
+    result.push({
       x: point.x,
       y: point.y,
       symbol: point.symbol,
     });
   }
+
+  return result;
+}
+
+// -------------------------
+// GEOMETRIC SMOOTHING
+// -------------------------
+
+function smoothPoints(points, iterations = 2) {
+  let result = copyPoints(points);
+
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    let newPoints = [];
+
+    newPoints.push({
+      x: result[0].x,
+      y: result[0].y,
+    });
+
+    for (let i = 0; i < result.length - 1; i++) {
+      let p1 = result[i];
+      let p2 = result[i + 1];
+
+      let q = {
+        x: lerp(p1.x, p2.x, 0.25),
+
+        y: lerp(p1.y, p2.y, 0.25),
+      };
+
+      let r = {
+        x: lerp(p1.x, p2.x, 0.75),
+
+        y: lerp(p1.y, p2.y, 0.75),
+      };
+
+      newPoints.push(q);
+      newPoints.push(r);
+    }
+
+    let lastPoint = result[result.length - 1];
+
+    newPoints.push({
+      x: lastPoint.x,
+      y: lastPoint.y,
+    });
+
+    result = newPoints;
+  }
+
+  return result;
+}
+
+// -------------------------
+// HISTORY
+// -------------------------
+
+function saveHistory(points) {
+  let snapshot = copyPoints(points);
 
   history.unshift(snapshot);
 
@@ -225,16 +338,16 @@ function saveHistory(points) {
   }
 }
 
-//draw history
 function drawHistory() {
   for (let i = 1; i < history.length; i++) {
     let points = history[i];
 
-    let alpha = map(i, 1, maxHistory, 90, 0);
+    let alpha = map(i, 1, maxHistory, 95, 5);
 
     let offset = i * historySpacing;
 
     drawHistoryLine(points, -offset, alpha);
+
     drawHistoryLine(points, offset, alpha);
   }
 }
@@ -242,39 +355,25 @@ function drawHistory() {
 function drawHistoryLine(points, yOffset, alpha) {
   if (points.length < 2) return;
 
+  let smooth = smoothPoints(points, 2);
+
   push();
 
   noFill();
+
   stroke(60, 140, 180, alpha);
-  strokeWeight(1);
+
+  strokeWeight(1.2);
 
   beginShape();
 
-  for (let point of points) {
+  for (let point of smooth) {
     vertex(point.x, point.y + yOffset);
   }
 
   endShape();
 
   pop();
-}
-
-function getInfluence(symbol) {
-  if (symbol === "A") return 0.0;
-  if (symbol === "B") return -0.9;
-  if (symbol === "C") return 0.9;
-  if (symbol === "D") return 0.0;
-
-  return 0.0;
-}
-
-function getDamping(symbol) {
-  if (symbol === "A") return 0.92;
-  if (symbol === "B") return 0.94;
-  if (symbol === "C") return 0.94;
-  if (symbol === "D") return 0.72;
-
-  return 0.9;
 }
 
 // -------------------------
@@ -295,15 +394,19 @@ function drawBaseline() {
 function drawSignalLine(points) {
   if (points.length < 2) return;
 
+  let smooth = smoothPoints(points, 2);
+
   push();
 
   noFill();
+
   stroke(0, 255, 255);
+
   strokeWeight(3);
 
   beginShape();
 
-  for (let point of points) {
+  for (let point of smooth) {
     vertex(point.x, point.y);
   }
 
@@ -324,7 +427,9 @@ function drawHUD() {
   textSize(16);
 
   text("Generation: " + generationCount, 20, 30);
+
   text("Length: " + currentString.length, 20, 55);
+
   text(currentString, 20, 80);
 
   pop();
@@ -335,15 +440,23 @@ function drawHUD() {
 // -------------------------
 
 function keyPressed() {
+  // SPACE
   if (key === " ") {
     isPaused = !isPaused;
+
     return false;
   }
 
+  // RESET
   if (key === "r" || key === "R") {
     initializeString();
 
     let initialPoints = buildLineFromString(currentString);
+
+    previousPoints = copyPoints(initialPoints);
+
+    targetPoints = copyPoints(initialPoints);
+
     saveHistory(initialPoints);
 
     lastGenerationTime = millis();
