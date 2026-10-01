@@ -32,6 +32,75 @@
       </p>
 
       <!-- The canvas p5 creates gets placed right here. -->
+      <section id="controls-panel">
+        <h2>Audio Mapping</h2>
+
+        <div class="control-row">
+          <label for="rule-source">Rule Probability</label>
+          <select id="rule-source">
+            <option value="none">None</option>
+            <option value="amplitude">Amplitude</option>
+            <option value="low">Low</option>
+            <option value="middle">Middle</option>
+            <option value="high">High</option>
+            <option value="centroid">Centroid</option>
+            <option value="flux" selected>Flux</option>
+          </select>
+        </div>
+
+        <div class="control-row">
+          <label for="timing-source">Generation Timing</label>
+          <select id="timing-source">
+            <option value="none" selected>None</option>
+            <option value="amplitude">Amplitude</option>
+            <option value="low">Low</option>
+            <option value="middle">Middle</option>
+            <option value="high">High</option>
+            <option value="centroid">Centroid</option>
+            <option value="flux">Flux</option>
+          </select>
+        </div>
+
+        <div class="control-row">
+          <label for="displacement-source">Vertical Displacement</label>
+          <select id="displacement-source">
+            <option value="none" selected>None</option>
+            <option value="amplitude">Amplitude</option>
+            <option value="low">Low</option>
+            <option value="middle">Middle</option>
+            <option value="high">High</option>
+            <option value="centroid">Centroid</option>
+            <option value="flux">Flux</option>
+          </select>
+        </div>
+
+        <div class="control-row">
+          <label for="thickness-source">Line Thickness</label>
+          <select id="thickness-source">
+            <option value="none" selected>None</option>
+            <option value="amplitude">Amplitude</option>
+            <option value="low">Low</option>
+            <option value="middle">Middle</option>
+            <option value="high">High</option>
+            <option value="centroid">Centroid</option>
+            <option value="flux">Flux</option>
+          </select>
+        </div>
+
+        <div class="control-row">
+          <label for="color-source">Color</label>
+          <select id="color-source">
+            <option value="none" selected>None</option>
+            <option value="amplitude">Amplitude</option>
+            <option value="low">Low</option>
+            <option value="middle">Middle</option>
+            <option value="high">High</option>
+            <option value="centroid">Centroid</option>
+            <option value="flux">Flux</option>
+          </select>
+        </div>
+      </section>
+
       <div id="sketch-holder"></div>
 
       <h2>Notes</h2>

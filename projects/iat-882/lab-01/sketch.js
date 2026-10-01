@@ -5,49 +5,40 @@
 //
 // SYSTEM OVERVIEW
 //
-// 1. A fixed-length stochastic L-system continuously rewrites
-//    a string made of A, B, C, and D symbols.
+// The system consists of four connected layers:
 //
-// 2. Each symbol is mapped to a vertical tendency, producing
-//    a horizontal signal line across the canvas.
+// 1. AUDIO ANALYSIS
+//    An MP3 is analyzed for six features:
+//    amplitude, low, middle, high, centroid, and flux.
 //
-// 3. Consecutive L-system generations are interpolated so the
-//    current signal morphs smoothly instead of jumping.
+// 2. MAPPING
+//    HTML dropdowns assign any audio feature to one of five
+//    generative / visual targets:
 //
-// 4. The current signal is rendered to an offscreen graphics
-//    layer. Periodic snapshots of that rendered layer are
-//    captured and moved upward and downward while fading.
+//      - Rule Probability
+//      - Generation Timing
+//      - Vertical Displacement
+//      - Line Thickness
+//      - Color
 //
-//    This temporal visualization is independent of the
-//    L-system generation history. It stores rendered visual
-//    states rather than symbolic generation states.
+// 3. STOCHASTIC L-SYSTEM
+//    A fixed-length symbolic string evolves through parallel
+//    stochastic rewriting.
 //
-// 5. An MP3 file is analyzed using amplitude, frequency-band
-//    energy, spectral centroid, and spectral flux.
+// 4. TEMPORAL VISUALIZATION
+//    The live signal is periodically captured as a rendered
+//    image. These snapshots drift upward and downward while
+//    fading, producing temporal echoes.
 //
-// 6. Spectral flux currently controls the amount of
-//    stochasticity in the L-system.
-//
-//    No audio:
-//      deterministic A-only rewriting.
-//
-//    Stronger flux:
-//      increasingly stochastic rewriting.
+// Thickness and color use AUDIO HISTORY rather than only the
+// current audio value. Recent sound is spatially distributed
+// from left to right across the signal.
 //
 // =========================================================
 
 // =========================================================
 // CONFIGURATION
 // =========================================================
-
-// ---------------------------------------------------------
-// Rule-control prototype
-// ---------------------------------------------------------
-//
-// Later this will be replaced by a user-selectable mapping.
-// For now, normalized spectral flux controls stochasticity.
-
-const RULE_CONTROL_SOURCE = "flux";
 
 // ---------------------------------------------------------
 // Canvas
@@ -57,25 +48,44 @@ const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
 
 // ---------------------------------------------------------
+// User-selected audio mappings
+// ---------------------------------------------------------
+//
+// These values are updated by HTML <select> elements.
+
+let ruleControlSource = "flux";
+let timingControlSource = "none";
+let displacementControlSource = "none";
+let thicknessControlSource = "none";
+let colorControlSource = "none";
+
+// ---------------------------------------------------------
 // L-system
 // ---------------------------------------------------------
 
 const INITIAL_STRING_LENGTH = 32;
 
-// New symbolic generations are produced at this interval.
-// Rendering still happens every visual frame.
-const GENERATION_INTERVAL = 300; // milliseconds
+// Used when Generation Timing = None.
+const DEFAULT_GENERATION_INTERVAL = 300;
+
+// Dynamic timing range when an audio source is assigned.
+//
+// low audio value  -> slower generations
+// high audio value -> faster generations
+
+const MIN_GENERATION_INTERVAL = 120;
+const MAX_GENERATION_INTERVAL = 700;
+
+const TIMING_SMOOTHING = 0.12;
 
 // ---------------------------------------------------------
-// Symbol-to-line mapping
+// Symbol-to-line geometry
 // ---------------------------------------------------------
 
 const UP_OFFSET = -90;
 const DOWN_OFFSET = 90;
 const QUIET_OFFSET = 25;
 
-// Smooths neighboring symbolic target heights before the
-// separate geometric smoothing stage.
 const SYMBOL_INTERPOLATION = 0.65;
 
 // ---------------------------------------------------------
@@ -85,34 +95,39 @@ const SYMBOL_INTERPOLATION = 0.65;
 const SMOOTHING_ITERATIONS = 2;
 
 // ---------------------------------------------------------
+// Line appearance
+// ---------------------------------------------------------
+
+const DEFAULT_LINE_WEIGHT = 3;
+
+const MIN_LINE_WEIGHT = 1;
+const MAX_LINE_WEIGHT = 8;
+
+// Cyan -> Magenta
+const CYAN = {
+  r: 0,
+  g: 255,
+  b: 255,
+};
+
+const MAGENTA = {
+  r: 255,
+  g: 0,
+  b: 255,
+};
+
+// ---------------------------------------------------------
 // Temporal snapshot visualization
 // ---------------------------------------------------------
-//
-// The current signal is rendered into an offscreen layer.
-// A snapshot of that layer is periodically captured.
-//
-// Each snapshot is then drawn twice:
-//   one copy moves upward,
-//   one copy moves downward.
-//
-// Both copies fade as they move away from the center.
-//
-// Because snapshots contain the already-rendered signal,
-// future visual changes to the signal automatically become
-// part of the temporal visualization.
 
-const SNAPSHOT_INTERVAL = 100; // milliseconds
+const SNAPSHOT_INTERVAL = 100; // ms
 
-// Movement speed in pixels per second.
-const SNAPSHOT_SPEED = 120;
+const SNAPSHOT_SPEED = 120; // px / second
 
-// Alpha when a snapshot is first created.
 const SNAPSHOT_START_ALPHA = 105;
 
-// Alpha removed per second.
-const SNAPSHOT_FADE_RATE = 70;
+const SNAPSHOT_FADE_RATE = 70; // alpha / second
 
-// Safety limit to prevent excessive image memory use.
 const MAX_SNAPSHOTS = 20;
 
 // ---------------------------------------------------------
@@ -123,11 +138,8 @@ const FFT_SIZE = 1024;
 const AMPLITUDE_SMOOTHING = 0.8;
 
 // ---------------------------------------------------------
-// Frequency bands
+// Frequency regions
 // ---------------------------------------------------------
-//
-// Broad frequency regions are used so the analyzer is not
-// designed around one particular musical genre.
 
 const LOW_MIN_HZ = 50;
 const LOW_MAX_HZ = 250;
@@ -139,11 +151,8 @@ const HIGH_MIN_HZ = 1200;
 const HIGH_MAX_HZ = 4000;
 
 // ---------------------------------------------------------
-// Adaptive audio normalization
+// Adaptive normalization
 // ---------------------------------------------------------
-//
-// Peaks slowly decay so tracks with very different spectral
-// balances can still produce useful relative 0–1 controls.
 
 const BAND_PEAK_DECAY = 0.995;
 const BAND_CONTROL_SMOOTHING = 0.15;
@@ -151,36 +160,71 @@ const BAND_CONTROL_SMOOTHING = 0.15;
 const FLUX_PEAK_DECAY = 0.995;
 const FLUX_CONTROL_SMOOTHING = 0.25;
 
+const CENTROID_PEAK_DECAY = 0.999;
+const CENTROID_CONTROL_SMOOTHING = 0.12;
+
+// ---------------------------------------------------------
+// Spatial audio history
+// ---------------------------------------------------------
+//
+// A sample is stored every 50 ms.
+//
+// 90 samples therefore represent roughly 4.5 seconds.
+//
+// Oldest samples are mapped to the left side of the line;
+// newest samples appear on the right.
+
+const AUDIO_HISTORY_LENGTH = 90;
+const AUDIO_HISTORY_INTERVAL = 50;
+
 // =========================================================
-// L-SYSTEM STATE
+// SYSTEM STATE
 // =========================================================
+
+// ---------------------------------------------------------
+// Master playback
+// ---------------------------------------------------------
+//
+// There is now only one pause state.
+//
+// SPACE controls:
+//   audio
+//   audio analysis
+//   L-system evolution
+//   generation interpolation
+//   snapshot capture
+//   snapshot movement
+
+let systemRunning = false;
+let systemHasStarted = false;
+
+let pauseStartedAt = 0;
+
+// ---------------------------------------------------------
+// HUD
+// ---------------------------------------------------------
+
+let showHUD = false;
+
+// ---------------------------------------------------------
+// L-system state
+// ---------------------------------------------------------
 
 let currentString = "";
 
 let generationCount = 0;
 let lastGenerationTime = 0;
 
-let isPaused = false;
+let currentGenerationInterval = DEFAULT_GENERATION_INTERVAL;
 
-// =========================================================
-// VISUAL STATE
-// =========================================================
+// ---------------------------------------------------------
+// Visual state
+// ---------------------------------------------------------
 
 let baselineY;
 
-// Two symbolic-generation shapes are stored so the visible
-// signal can smoothly interpolate between them.
 let previousPoints = [];
 let targetPoints = [];
-
-// ---------------------------------------------------------
-// Offscreen signal layer
-// ---------------------------------------------------------
-//
-// Only the current signal is drawn here.
-//
-// HUD, controls, and debug graphics remain on the main canvas
-// so they do not become part of temporal snapshots.
 
 let signalLayer;
 
@@ -200,86 +244,92 @@ let fft;
 let amplitude;
 
 // ---------------------------------------------------------
-// Overall loudness
+// Amplitude
 // ---------------------------------------------------------
 
 let audioLevel = 0;
 
 // ---------------------------------------------------------
-// Raw frequency-band energy
+// Frequency-band energy
 // ---------------------------------------------------------
 
 let lowEnergy = 0;
 let middleEnergy = 0;
 let highEnergy = 0;
 
-// ---------------------------------------------------------
-// Normalized frequency controls
-// ---------------------------------------------------------
-//
-// These are relative 0–1 values intended for later
-// generative mappings.
-
 let lowControl = 0;
 let middleControl = 0;
 let highControl = 0;
-
-// ---------------------------------------------------------
-// Adaptive band peaks
-// ---------------------------------------------------------
 
 let lowPeak = 0.001;
 let middlePeak = 0.001;
 let highPeak = 0.001;
 
 // ---------------------------------------------------------
-// Spectral features
+// Spectral centroid
 // ---------------------------------------------------------
 
 let spectralCentroid = 0;
+
+let centroidControl = 0;
+let centroidPeak = 0.01;
+
+// ---------------------------------------------------------
+// Spectral flux
+// ---------------------------------------------------------
+
 let spectralFlux = 0;
-
-// Previous FFT frame is required to measure spectral change.
-let previousSpectrum = [];
-
-// ---------------------------------------------------------
-// Spectral-flux control
-// ---------------------------------------------------------
 
 let fluxControl = 0;
 let fluxPeak = 0.0001;
+
+let previousSpectrum = [];
+
+// =========================================================
+// AUDIO HISTORY
+// =========================================================
+//
+// Every feature gets its own recent-value buffer.
+//
+// This allows the user to switch Thickness or Color sources
+// without rebuilding the audio history from scratch.
+
+let audioHistory = {
+  amplitude: [],
+  low: [],
+  middle: [],
+  high: [],
+  centroid: [],
+  flux: [],
+};
+
+let lastAudioHistoryTime = 0;
 
 // =========================================================
 // STOCHASTIC L-SYSTEM RULES
 // =========================================================
 //
-// Every symbol rewrites into exactly one symbol.
+// Every input symbol produces exactly one output symbol.
 //
-// Therefore the string remains the same length across
-// generations. This avoids exponential growth while still
-// allowing the symbolic state to evolve continuously.
+// This keeps the string at a constant length and prevents
+// exponential growth.
 //
-// Visual meanings:
+// Symbol meanings:
 //
-// A = neutral / baseline tendency
+// A = baseline
 // B = upward tendency
 // C = downward tendency
-// D = quieter / small downward tendency
+// D = smaller downward tendency
 //
-// These weights represent the system at maximum
-// stochasticity.
+// The values below represent MAXIMUM stochasticity.
 //
-// The active weights are dynamically interpolated between:
+// When Rule Probability control = 0:
 //
-//   deterministic:
-//     A = 1
-//     B = 0
-//     C = 0
-//     D = 0
+//   A = 100%
 //
-// and:
+// When control approaches 1:
 //
-//   the stochastic distributions below.
+//   the distributions below become fully active.
 //
 // =========================================================
 
@@ -324,17 +374,17 @@ async function setup() {
 
   baselineY = height / 2;
 
+  // Connect HTML dropdowns to the sketch.
+  setupControls();
+
   // -------------------------------------------------------
-  // Create the offscreen visual layer.
+  // Offscreen signal layer
   // -------------------------------------------------------
-  //
-  // p5.Graphics uses a transparent background by default.
-  // We clear it every frame and draw only the current signal.
 
   signalLayer = createGraphics(width, height);
 
   // -------------------------------------------------------
-  // Load and connect audio.
+  // Audio
   // -------------------------------------------------------
 
   song = await loadSound("audio/track.mp3");
@@ -347,7 +397,7 @@ async function setup() {
   song.connect(amplitude);
 
   // -------------------------------------------------------
-  // Initialize the L-system.
+  // Initial L-system
   // -------------------------------------------------------
 
   initializeString();
@@ -358,9 +408,19 @@ async function setup() {
 
   targetPoints = copyPoints(initialPoints);
 
-  lastGenerationTime = millis();
+  // -------------------------------------------------------
+  // Initial audio history
+  // -------------------------------------------------------
 
-  lastSnapshotTime = millis();
+  resetAudioHistory();
+
+  const now = millis();
+
+  lastGenerationTime = now;
+  lastSnapshotTime = now;
+  lastAudioHistoryTime = now;
+
+  pauseStartedAt = now;
 
   console.log("Audio loaded:", song);
 
@@ -375,71 +435,99 @@ function draw() {
   background(0);
 
   // -------------------------------------------------------
-  // 1. Analyze audio every visual frame.
+  // All time-dependent systems update only while running.
   // -------------------------------------------------------
 
-  analyzeAudio();
+  if (systemRunning) {
+    analyzeAudio();
+
+    updateAudioHistory();
+
+    updateGenerationTiming();
+
+    updateGeneration();
+
+    updateSnapshotCapture();
+
+    updateTemporalSnapshots();
+  }
 
   // -------------------------------------------------------
-  // 2. Update symbolic generation when its timer expires.
+  // Current visual state
   // -------------------------------------------------------
+  //
+  // getInterpolatedSignalPoints() uses an effective clock,
+  // so generation morphing also freezes during pause.
 
-  updateGeneration();
+  let displayPoints = getInterpolatedSignalPoints();
 
-  // -------------------------------------------------------
-  // 3. Calculate the smoothly interpolated current signal.
-  // -------------------------------------------------------
+  // Vertical displacement is a global/current audio mapping.
+  displayPoints = applyVerticalDisplacement(displayPoints);
 
-  const displayPoints = getInterpolatedSignalPoints();
-
-  // -------------------------------------------------------
-  // 4. Render current signal to offscreen layer.
-  // -------------------------------------------------------
-
+  // Render the styled signal to its offscreen layer.
   renderSignalLayer(displayPoints);
 
   // -------------------------------------------------------
-  // 5. Capture temporal snapshots when appropriate.
-  // -------------------------------------------------------
-
-  updateSnapshotCapture();
-
-  // -------------------------------------------------------
-  // 6. Advance all stored snapshots every visual frame.
-  // -------------------------------------------------------
-
-  updateTemporalSnapshots();
-
-  // -------------------------------------------------------
-  // 7. Draw temporal echoes first so the current signal
-  //    remains visually dominant.
+  // Final compositing order
   // -------------------------------------------------------
 
   drawTemporalSnapshots();
 
-  // -------------------------------------------------------
-  // 8. Draw fixed center reference line.
-  //
-  //    The baseline intentionally does NOT belong to the
-  //    snapshot layer, so it remains stationary.
-  // -------------------------------------------------------
-
   drawBaseline();
-
-  // -------------------------------------------------------
-  // 9. Draw the live signal at the center.
-  // -------------------------------------------------------
 
   image(signalLayer, 0, 0);
 
-  // -------------------------------------------------------
-  // 10. Draw interface/debug information last.
-  //
-  //     HUD graphics never enter the snapshot system.
-  // -------------------------------------------------------
+  // HUD exists only while H is held.
+  if (showHUD) {
+    drawHUD();
+    drawAudioMeters();
+  }
+}
 
-  drawHUD();
-  drawAudioMeters();
+// =========================================================
+// HTML CONTROL CONNECTIONS
+// =========================================================
+
+function setupControls() {
+  const ruleSelect = document.getElementById("rule-source");
+
+  const timingSelect = document.getElementById("timing-source");
+
+  const displacementSelect = document.getElementById("displacement-source");
+
+  const thicknessSelect = document.getElementById("thickness-source");
+
+  const colorSelect = document.getElementById("color-source");
+
+  ruleControlSource = ruleSelect.value;
+
+  timingControlSource = timingSelect.value;
+
+  displacementControlSource = displacementSelect.value;
+
+  thicknessControlSource = thicknessSelect.value;
+
+  colorControlSource = colorSelect.value;
+
+  ruleSelect.addEventListener("change", function () {
+    ruleControlSource = this.value;
+  });
+
+  timingSelect.addEventListener("change", function () {
+    timingControlSource = this.value;
+  });
+
+  displacementSelect.addEventListener("change", function () {
+    displacementControlSource = this.value;
+  });
+
+  thicknessSelect.addEventListener("change", function () {
+    thicknessControlSource = this.value;
+  });
+
+  colorSelect.addEventListener("change", function () {
+    colorControlSource = this.value;
+  });
 }
 
 // =========================================================
@@ -447,30 +535,7 @@ function draw() {
 // =========================================================
 
 function analyzeAudio() {
-  // When audio is not playing, current analysis/control
-  // values return to zero.
-  //
-  // Peak calibration is intentionally preserved so pause /
-  // resume does not reset normalization every time.
-
   if (!song || !song.isPlaying()) {
-    audioLevel = 0;
-
-    lowEnergy = 0;
-    middleEnergy = 0;
-    highEnergy = 0;
-
-    lowControl = 0;
-    middleControl = 0;
-    highControl = 0;
-
-    spectralCentroid = 0;
-    spectralFlux = 0;
-
-    fluxControl = 0;
-
-    previousSpectrum = [];
-
     return;
   }
 
@@ -485,10 +550,6 @@ function analyzeAudio() {
   // -------------------------------------------------------
   // Frequency-band energy
   // -------------------------------------------------------
-  //
-  // RMS is used instead of a simple arithmetic mean.
-  // Strong spectral components therefore retain more
-  // influence within each frequency region.
 
   lowEnergy = getBandEnergy(spectrum, LOW_MIN_HZ, LOW_MAX_HZ);
 
@@ -501,22 +562,14 @@ function analyzeAudio() {
   // -------------------------------------------------------
   // Spectral centroid
   // -------------------------------------------------------
-  //
-  // Measures the spectrum's frequency center of gravity.
-  // Higher values generally indicate more high-frequency
-  // spectral emphasis.
 
   spectralCentroid = calculateSpectralCentroid(spectrum);
+
+  updateCentroidControl();
 
   // -------------------------------------------------------
   // Spectral flux
   // -------------------------------------------------------
-  //
-  // Measures positive spectral change relative to the
-  // previous FFT frame.
-  //
-  // It can react to attacks, transitions, rhythmic events,
-  // and other sudden changes in spectral content.
 
   spectralFlux = calculateSpectralFlux(spectrum, previousSpectrum);
 
@@ -530,26 +583,24 @@ function analyzeAudio() {
 // =========================================================
 
 function updateBandControls() {
-  // Slowly forget old peaks.
   lowPeak *= BAND_PEAK_DECAY;
+
   middlePeak *= BAND_PEAK_DECAY;
+
   highPeak *= BAND_PEAK_DECAY;
 
-  // Store stronger recent peaks.
   lowPeak = max(lowPeak, lowEnergy);
 
   middlePeak = max(middlePeak, middleEnergy);
 
   highPeak = max(highPeak, highEnergy);
 
-  // Convert raw measurements into relative 0–1 targets.
   const targetLow = constrain(lowEnergy / lowPeak, 0, 1);
 
   const targetMiddle = constrain(middleEnergy / middlePeak, 0, 1);
 
   const targetHigh = constrain(highEnergy / highPeak, 0, 1);
 
-  // Smooth the control signals to reduce frame-level jitter.
   lowControl = lerp(lowControl, targetLow, BAND_CONTROL_SMOOTHING);
 
   middleControl = lerp(middleControl, targetMiddle, BAND_CONTROL_SMOOTHING);
@@ -557,10 +608,38 @@ function updateBandControls() {
   highControl = lerp(highControl, targetHigh, BAND_CONTROL_SMOOTHING);
 }
 
-function updateFluxControl() {
-  // Flux normalization follows the same adaptive-peak idea
-  // used by the frequency bands.
+// ---------------------------------------------------------
+// Centroid normalization
+// ---------------------------------------------------------
+//
+// Raw centroid values occupy only a small portion of the
+// theoretical 0–1 Nyquist range.
+//
+// A slowly decaying recent peak converts them into a more
+// usable relative control signal.
+//
+// spectralCentroid remains the raw measurement.
+// centroidControl is the normalized mapping value.
 
+function updateCentroidControl() {
+  centroidPeak *= CENTROID_PEAK_DECAY;
+
+  centroidPeak = max(centroidPeak, spectralCentroid);
+
+  const targetCentroid = constrain(spectralCentroid / centroidPeak, 0, 1);
+
+  centroidControl = lerp(
+    centroidControl,
+    targetCentroid,
+    CENTROID_CONTROL_SMOOTHING,
+  );
+}
+
+// ---------------------------------------------------------
+// Flux normalization
+// ---------------------------------------------------------
+
+function updateFluxControl() {
   fluxPeak *= FLUX_PEAK_DECAY;
 
   fluxPeak = max(fluxPeak, spectralFlux);
@@ -568,6 +647,132 @@ function updateFluxControl() {
   const targetFlux = constrain(spectralFlux / fluxPeak, 0, 1);
 
   fluxControl = lerp(fluxControl, targetFlux, FLUX_CONTROL_SMOOTHING);
+}
+
+// =========================================================
+// AUDIO VALUE RESOLVER
+// =========================================================
+//
+// All five generative targets use this one resolver.
+//
+// Therefore the interface can assign any of the six
+// normalized audio features to any target.
+//
+// "none" always returns zero.
+//
+// =========================================================
+
+function getAudioControlValue(source) {
+  if (source === "amplitude") {
+    return constrain(audioLevel * 4, 0, 1);
+  }
+
+  if (source === "low") {
+    return lowControl;
+  }
+
+  if (source === "middle") {
+    return middleControl;
+  }
+
+  if (source === "high") {
+    return highControl;
+  }
+
+  if (source === "centroid") {
+    return centroidControl;
+  }
+
+  if (source === "flux") {
+    return fluxControl;
+  }
+
+  return 0;
+}
+
+// =========================================================
+// AUDIO HISTORY
+// =========================================================
+//
+// Global targets use the CURRENT value:
+//
+//   rule probability
+//   generation timing
+//   vertical displacement
+//
+// Spatial targets use RECENT AUDIO HISTORY:
+//
+//   line thickness
+//   color
+//
+// =========================================================
+
+function resetAudioHistory() {
+  for (const key in audioHistory) {
+    audioHistory[key] = new Array(AUDIO_HISTORY_LENGTH).fill(0);
+  }
+}
+
+function updateAudioHistory() {
+  if (millis() - lastAudioHistoryTime < AUDIO_HISTORY_INTERVAL) {
+    return;
+  }
+
+  pushAudioHistoryValue("amplitude", getAudioControlValue("amplitude"));
+
+  pushAudioHistoryValue("low", lowControl);
+
+  pushAudioHistoryValue("middle", middleControl);
+
+  pushAudioHistoryValue("high", highControl);
+
+  pushAudioHistoryValue("centroid", centroidControl);
+
+  pushAudioHistoryValue("flux", fluxControl);
+
+  lastAudioHistoryTime = millis();
+}
+
+function pushAudioHistoryValue(feature, value) {
+  const history = audioHistory[feature];
+
+  history.push(constrain(value, 0, 1));
+
+  if (history.length > AUDIO_HISTORY_LENGTH) {
+    history.shift();
+  }
+}
+
+// ---------------------------------------------------------
+// Spatial history lookup
+// ---------------------------------------------------------
+//
+// position = 0 → oldest audio
+// position = 1 → newest audio
+//
+// Values between stored samples are linearly interpolated,
+// preventing visible step changes along the signal.
+
+function getAudioHistoryValue(source, position) {
+  if (source === "none" || !audioHistory[source]) {
+    return 0;
+  }
+
+  const history = audioHistory[source];
+
+  if (history.length === 0) {
+    return 0;
+  }
+
+  const index = constrain(position, 0, 1) * (history.length - 1);
+
+  const indexA = floor(index);
+
+  const indexB = min(indexA + 1, history.length - 1);
+
+  const localAmount = index - indexA;
+
+  return lerp(history[indexA], history[indexB], localAmount);
 }
 
 // =========================================================
@@ -629,13 +834,10 @@ function calculateSpectralCentroid(spectrum) {
 
   const centroidHz = weightedSum / magnitudeSum;
 
-  // Normalize position within the available spectrum.
   return constrain(centroidHz / nyquist, 0, 1);
 }
 
 function calculateSpectralFlux(spectrum, previous) {
-  // Flux requires a previous FFT frame of equal length.
-
   if (previous.length !== spectrum.length) {
     return 0;
   }
@@ -646,11 +848,7 @@ function calculateSpectralFlux(spectrum, previous) {
   for (let i = 0; i < spectrum.length; i++) {
     const difference = spectrum[i] - previous[i];
 
-    // Count only increases in spectral energy.
-    //
-    // This emphasizes newly appearing spectral events
-    // rather than ordinary decay.
-
+    // Only newly increasing spectral energy contributes.
     if (difference > 0) {
       sumSquares += difference * difference;
 
@@ -680,15 +878,46 @@ function initializeString() {
 }
 
 // =========================================================
+// GENERATION TIMING
+// =========================================================
+
+function updateGenerationTiming() {
+  // No mapping:
+  // preserve the original fixed generation interval.
+
+  if (timingControlSource === "none") {
+    currentGenerationInterval = lerp(
+      currentGenerationInterval,
+      DEFAULT_GENERATION_INTERVAL,
+      TIMING_SMOOTHING,
+    );
+
+    return;
+  }
+
+  const control = getAudioControlValue(timingControlSource);
+
+  // Higher audio control means faster evolution.
+
+  const targetInterval = lerp(
+    MAX_GENERATION_INTERVAL,
+    MIN_GENERATION_INTERVAL,
+    control,
+  );
+
+  currentGenerationInterval = lerp(
+    currentGenerationInterval,
+    targetInterval,
+    TIMING_SMOOTHING,
+  );
+}
+
+// =========================================================
 // L-SYSTEM GENERATION
 // =========================================================
 
 function updateGeneration() {
-  if (isPaused) {
-    return;
-  }
-
-  if (millis() - lastGenerationTime < GENERATION_INTERVAL) {
+  if (millis() - lastGenerationTime < currentGenerationInterval) {
     return;
   }
 
@@ -700,15 +929,10 @@ function updateGeneration() {
 function generateNextGeneration() {
   let nextString = "";
 
-  // -------------------------------------------------------
-  // Parallel rewriting
-  // -------------------------------------------------------
+  // Parallel rewriting:
   //
-  // Every symbol is read from the OLD generation and written
-  // into a separate new string.
-  //
-  // Newly produced symbols therefore cannot be rewritten
-  // again during the same generation.
+  // every output symbol is derived only from the previous
+  // generation, never from newly created symbols.
 
   for (let i = 0; i < currentString.length; i++) {
     const currentSymbol = currentString[i];
@@ -720,10 +944,8 @@ function generateNextGeneration() {
 
   generationCount++;
 
-  // The old target becomes the start of the visual morph.
   previousPoints = copyPoints(targetPoints);
 
-  // Build the geometry for the new symbolic generation.
   targetPoints = buildLineFromString(currentString);
 
   console.log("Generation", generationCount, currentString);
@@ -747,24 +969,9 @@ function rewriteSymbol(symbol) {
   return weightedChoice(dynamicOptions);
 }
 
-// ---------------------------------------------------------
-// Current mapping prototype
-// ---------------------------------------------------------
-//
-// Later this function will read the user's selected audio
-// feature from the interface.
-
 function getRuleProbabilityControl() {
-  if (RULE_CONTROL_SOURCE === "flux") {
-    return fluxControl;
-  }
-
-  return 0;
+  return getAudioControlValue(ruleControlSource);
 }
-
-// ---------------------------------------------------------
-// Deterministic -> stochastic interpolation
-// ---------------------------------------------------------
 
 function createDynamicRuleWeights(baseOptions, controlValue) {
   const dynamicOptions = [];
@@ -779,13 +986,11 @@ function createDynamicRuleWeights(baseOptions, controlValue) {
 
     const deterministicWeight = option.symbol === "A" ? 1 : 0;
 
-    // Audio control continuously interpolates between the
-    // deterministic state and the predefined stochastic rule.
-
     const dynamicWeight = lerp(deterministicWeight, option.weight, amount);
 
     dynamicOptions.push({
       symbol: option.symbol,
+
       weight: dynamicWeight,
     });
   }
@@ -812,19 +1017,25 @@ function weightedChoice(options) {
     }
   }
 
-  // Floating-point safety fallback.
   return options[options.length - 1].symbol;
 }
 
 // =========================================================
-// SYMBOL STRING -> VISUAL LINE
+// SYMBOL STRING -> BASE GEOMETRY
+// =========================================================
+//
+// This stage creates the BASE shape.
+//
+// Audio-controlled Vertical Displacement is applied later,
+// during rendering.
+//
+// Keeping these stages separate allows displacement to react
+// every frame without rewriting the L-system.
+//
 // =========================================================
 
 function buildLineFromString(sequence) {
   const points = [];
-
-  // First point begins at x = 0.
-  // Final point ends at x = width.
 
   const xStep = width / max(1, sequence.length - 1);
 
@@ -851,11 +1062,6 @@ function buildLineFromString(sequence) {
       targetY = baselineY + QUIET_OFFSET;
     }
 
-    // Partially approach each symbol's target.
-    //
-    // This provides local smoothing before Chaikin
-    // geometric smoothing is applied later.
-
     currentY = lerp(currentY, targetY, SYMBOL_INTERPOLATION);
 
     points.push({
@@ -869,6 +1075,50 @@ function buildLineFromString(sequence) {
 }
 
 // =========================================================
+// VERTICAL DISPLACEMENT
+// =========================================================
+//
+// None:
+//   the original ±90 px geometry is preserved.
+//
+// Audio source selected:
+//   0 → collapse toward baseline
+//   1 → full original displacement
+//
+// This transformation happens every frame and therefore
+// reacts continuously rather than only once per generation.
+//
+// =========================================================
+
+function getDisplacementScale() {
+  if (displacementControlSource === "none") {
+    return 1;
+  }
+
+  return getAudioControlValue(displacementControlSource);
+}
+
+function applyVerticalDisplacement(points) {
+  const scale = getDisplacementScale();
+
+  const result = [];
+
+  for (const point of points) {
+    const distanceFromBaseline = point.y - baselineY;
+
+    result.push({
+      x: point.x,
+
+      y: baselineY + distanceFromBaseline * scale,
+
+      symbol: point.symbol,
+    });
+  }
+
+  return result;
+}
+
+// =========================================================
 // GENERATION-TO-GENERATION INTERPOLATION
 // =========================================================
 
@@ -877,12 +1127,15 @@ function getInterpolatedSignalPoints() {
     return [];
   }
 
-  let progress = (millis() - lastGenerationTime) / GENERATION_INTERVAL;
+  // During pause we use the moment at which pause started.
+  // This freezes the visual morph rather than allowing millis()
+  // to silently advance it in the background.
+
+  const now = systemRunning ? millis() : pauseStartedAt;
+
+  let progress = (now - lastGenerationTime) / currentGenerationInterval;
 
   progress = constrain(progress, 0, 1);
-
-  // Smoothstep creates ease-in / ease-out motion between
-  // consecutive symbolic generations.
 
   progress = smoothStep(progress);
 
@@ -913,10 +1166,8 @@ function smoothStep(t) {
 // GEOMETRIC SMOOTHING
 // =========================================================
 //
-// Chaikin corner-cutting is used only for rendering.
-//
-// The symbolic L-system state remains discrete and unchanged.
-// Smoothing therefore changes only its visual interpretation.
+// Chaikin corner cutting modifies only the rendered geometry,
+// not the underlying symbolic L-system.
 //
 // =========================================================
 
@@ -926,7 +1177,6 @@ function smoothPoints(points, iterations = SMOOTHING_ITERATIONS) {
   for (let iteration = 0; iteration < iterations; iteration++) {
     const newPoints = [];
 
-    // Preserve first endpoint.
     newPoints.push({
       x: result[0].x,
       y: result[0].y,
@@ -953,7 +1203,6 @@ function smoothPoints(points, iterations = SMOOTHING_ITERATIONS) {
       newPoints.push(r);
     }
 
-    // Preserve final endpoint.
     const lastPoint = result[result.length - 1];
 
     newPoints.push({
@@ -989,15 +1238,15 @@ function copyPoints(points) {
 // SIGNAL LAYER
 // =========================================================
 //
-// The live signal is rendered once into an offscreen layer.
+// The smoothed signal is drawn as many short line segments
+// instead of one beginShape().
 //
-// The same rendered layer is:
+// This allows color and stroke weight to change continuously
+// along the x-axis.
 //
-//   1. displayed as the current central signal,
-//   2. periodically copied into the temporal snapshot system.
-//
-// This means future changes to the signal's visual appearance
-// automatically propagate into new temporal snapshots.
+// Because Chaikin smoothing creates many closely spaced
+// points, the individual segments still appear as one smooth
+// continuous line.
 //
 // =========================================================
 
@@ -1012,70 +1261,100 @@ function renderSignalLayer(points) {
 
   signalLayer.push();
 
-  signalLayer.noFill();
+  signalLayer.strokeCap(ROUND);
 
-  // -------------------------------------------------------
-  // CURRENT SIGNAL VISUAL STYLE
-  // -------------------------------------------------------
-  //
-  // Future changes to color, line weight, or other visual
-  // properties should happen here.
-  //
-  // Because snapshots are captured from signalLayer, these
-  // changes automatically become part of the temporal effect.
+  for (let i = 0; i < smooth.length - 1; i++) {
+    const p1 = smooth[i];
 
-  signalLayer.stroke(0, 255, 255);
+    const p2 = smooth[i + 1];
 
-  signalLayer.strokeWeight(3);
+    // Normalized horizontal position.
+    const t = i / max(1, smooth.length - 2);
 
-  signalLayer.beginShape();
+    // -----------------------------------------------------
+    // Thickness
+    // -----------------------------------------------------
 
-  for (const point of smooth) {
-    signalLayer.vertex(point.x, point.y);
+    const lineWeight = getSpatialLineWeight(t);
+
+    // -----------------------------------------------------
+    // Color
+    // -----------------------------------------------------
+
+    const lineColor = getSpatialLineColor(t);
+
+    signalLayer.stroke(lineColor.r, lineColor.g, lineColor.b);
+
+    signalLayer.strokeWeight(lineWeight);
+
+    signalLayer.line(p1.x, p1.y, p2.x, p2.y);
   }
-
-  signalLayer.endShape();
 
   signalLayer.pop();
 }
 
 // =========================================================
-// TEMPORAL SNAPSHOT SYSTEM
+// SPATIAL THICKNESS
 // =========================================================
 //
-// This replaces the earlier generation-history system.
+// None:
+//   constant 3 px line.
 //
-// A snapshot is NOT an L-system generation.
+// Audio source:
+//   recent audio history is mapped across x.
 //
-// It is a rendered visual state of the live signal at a
-// particular moment in time.
-//
-// Each snapshot:
-//
-//   - starts at the center,
-//   - moves upward and downward simultaneously,
-//   - fades continuously,
-//   - disappears when fully transparent.
-//
-// The system therefore behaves more like a moving temporal
-// echo / afterimage than a symbolic history visualization.
+// Old audio -> left.
+// New audio -> right.
 //
 // =========================================================
 
-// ---------------------------------------------------------
-// Snapshot capture
-// ---------------------------------------------------------
-
-function updateSnapshotCapture() {
-  // Do not continuously generate identical flat snapshots
-  // when audio is stopped.
-  //
-  // Existing snapshots are still allowed to drift and fade.
-
-  if (!song || !song.isPlaying()) {
-    return;
+function getSpatialLineWeight(position) {
+  if (thicknessControlSource === "none") {
+    return DEFAULT_LINE_WEIGHT;
   }
 
+  const value = getAudioHistoryValue(thicknessControlSource, position);
+
+  return lerp(MIN_LINE_WEIGHT, MAX_LINE_WEIGHT, value);
+}
+
+// =========================================================
+// SPATIAL COLOR
+// =========================================================
+//
+// None:
+//   constant cyan.
+//
+// Audio source:
+//   value 0 -> cyan
+//   value 1 -> magenta
+//
+// Audio history creates a smooth spatial gradient rather than
+// changing the entire line to one color simultaneously.
+//
+// =========================================================
+
+function getSpatialLineColor(position) {
+  if (colorControlSource === "none") {
+    return CYAN;
+  }
+
+  const value = getAudioHistoryValue(colorControlSource, position);
+
+  return {
+    r: lerp(CYAN.r, MAGENTA.r, value),
+
+    g: lerp(CYAN.g, MAGENTA.g, value),
+
+    b: lerp(CYAN.b, MAGENTA.b, value),
+  };
+}
+
+// =========================================================
+// TEMPORAL SNAPSHOT SYSTEM
+// =========================================================
+
+function updateSnapshotCapture() {
   if (millis() - lastSnapshotTime < SNAPSHOT_INTERVAL) {
     return;
   }
@@ -1086,11 +1365,6 @@ function updateSnapshotCapture() {
 }
 
 function captureSignalSnapshot() {
-  // signalLayer.get() captures the already-rendered line.
-  //
-  // It does not need to know anything about symbols,
-  // generations, smoothing, colors, or line thickness.
-
   const snapshotImage = signalLayer.get();
 
   temporalSnapshots.push({
@@ -1101,20 +1375,12 @@ function captureSignalSnapshot() {
     alpha: SNAPSHOT_START_ALPHA,
   });
 
-  // Prevent unlimited memory growth.
   if (temporalSnapshots.length > MAX_SNAPSHOTS) {
     temporalSnapshots.shift();
   }
 }
 
-// ---------------------------------------------------------
-// Snapshot animation
-// ---------------------------------------------------------
-
 function updateTemporalSnapshots() {
-  // Convert milliseconds to seconds so temporal motion is
-  // approximately independent of frame rate.
-
   const seconds = deltaTime / 1000;
 
   for (const snapshot of temporalSnapshots) {
@@ -1123,15 +1389,10 @@ function updateTemporalSnapshots() {
     snapshot.alpha -= SNAPSHOT_FADE_RATE * seconds;
   }
 
-  // Remove snapshots after they become invisible.
   temporalSnapshots = temporalSnapshots.filter(
     (snapshot) => snapshot.alpha > 0,
   );
 }
-
-// ---------------------------------------------------------
-// Snapshot rendering
-// ---------------------------------------------------------
 
 function drawTemporalSnapshots() {
   push();
@@ -1141,10 +1402,8 @@ function drawTemporalSnapshots() {
 
     tint(255, alpha);
 
-    // Upper temporal echo
     image(snapshot.image, 0, -snapshot.offset);
 
-    // Lower temporal echo
     image(snapshot.image, 0, snapshot.offset);
   }
 
@@ -1154,20 +1413,14 @@ function drawTemporalSnapshots() {
 }
 
 // =========================================================
-// FIXED BASELINE
-// =========================================================
-//
-// The baseline is intentionally drawn on the main canvas
-// rather than signalLayer.
-//
-// Therefore it does not become part of temporal snapshots.
-//
+// BASELINE
 // =========================================================
 
 function drawBaseline() {
   push();
 
   stroke(50);
+
   strokeWeight(1);
 
   line(0, baselineY, width, baselineY);
@@ -1176,14 +1429,108 @@ function drawBaseline() {
 }
 
 // =========================================================
+// MASTER PLAY / PAUSE
+// =========================================================
+//
+// SPACE now controls the entire system.
+//
+// First press:
+//   starts audio and generative animation.
+//
+// Pause:
+//   pauses audio,
+//   freezes generation timing,
+//   freezes interpolation,
+//   stops snapshot creation,
+//   freezes snapshot movement.
+//
+// Resume:
+//   all internal clocks are shifted by the paused duration,
+//   allowing animation to continue from the exact point at
+//   which it stopped.
+//
+// =========================================================
+
+async function toggleSystemPlayback() {
+  if (!song) {
+    return;
+  }
+
+  // -------------------------------------------------------
+  // PAUSE
+  // -------------------------------------------------------
+
+  if (systemRunning) {
+    pauseStartedAt = millis();
+
+    if (song.isPlaying()) {
+      song.pause();
+    }
+
+    systemRunning = false;
+
+    return;
+  }
+
+  // -------------------------------------------------------
+  // FIRST START
+  // -------------------------------------------------------
+
+  if (!systemHasStarted) {
+    await userStartAudio();
+
+    song.play();
+
+    systemRunning = true;
+
+    systemHasStarted = true;
+
+    const now = millis();
+
+    lastGenerationTime = now;
+
+    lastSnapshotTime = now;
+
+    lastAudioHistoryTime = now;
+
+    return;
+  }
+
+  // -------------------------------------------------------
+  // RESUME
+  // -------------------------------------------------------
+
+  const resumeTime = millis();
+
+  const pausedDuration = resumeTime - pauseStartedAt;
+
+  // Shift time-based systems forward by exactly the amount
+  // of time spent paused.
+
+  lastGenerationTime += pausedDuration;
+
+  lastSnapshotTime += pausedDuration;
+
+  lastAudioHistoryTime += pausedDuration;
+
+  await userStartAudio();
+
+  song.play();
+
+  systemRunning = true;
+}
+
+// =========================================================
 // DEBUG HUD
 // =========================================================
 //
-// The HUD exposes the current symbolic and audio states while
-// the project is being developed.
+// Hold H to display.
 //
-// Because it is drawn directly to the main canvas after the
-// temporal effect, it never appears in snapshots.
+// The HUD is development instrumentation rather than part of
+// the final visual composition.
+//
+// All displayed audio features are control values intended
+// for mapping, not raw FFT magnitudes.
 //
 // =========================================================
 
@@ -1201,11 +1548,9 @@ function drawHUD() {
 
   text(currentString, 20, 80);
 
-  const audioPlaying = song && song.isPlaying();
+  text("System: " + (systemRunning ? "PLAYING" : "PAUSED"), 20, 120);
 
-  text("Audio: " + (audioPlaying ? "PLAYING" : "PAUSED"), 20, 120);
-
-  text("Amplitude: " + nf(audioLevel, 1, 3), 20, 145);
+  text("Amplitude: " + nf(getAudioControlValue("amplitude"), 1, 2), 20, 145);
 
   text("Low: " + nf(lowControl, 1, 2), 20, 170);
 
@@ -1213,13 +1558,27 @@ function drawHUD() {
 
   text("High: " + nf(highControl, 1, 2), 20, 220);
 
-  text("Centroid: " + nf(spectralCentroid, 1, 3), 20, 245);
+  text("Centroid: " + nf(centroidControl, 1, 2), 20, 245);
 
-  text("Flux raw: " + nf(spectralFlux, 1, 6), 20, 270);
+  text("Flux: " + nf(fluxControl, 1, 2), 20, 270);
 
-  text("Flux control: " + nf(fluxControl, 1, 2), 20, 295);
+  text(
+    "Generation interval: " + nf(currentGenerationInterval, 1, 0) + " ms",
+    20,
+    305,
+  );
 
-  text("Rule control: " + nf(getRuleProbabilityControl(), 1, 2), 20, 320);
+  text("Displacement: " + nf(getDisplacementScale(), 1, 2), 20, 330);
+
+  text("Rule: " + ruleControlSource, 20, 365);
+
+  text("Timing: " + timingControlSource, 20, 390);
+
+  text("Displacement: " + displacementControlSource, 20, 415);
+
+  text("Thickness: " + thicknessControlSource, 20, 440);
+
+  text("Color: " + colorControlSource, 20, 465);
 
   pop();
 }
@@ -1230,135 +1589,129 @@ function drawHUD() {
 
 function drawAudioMeters() {
   const x = 20;
-  const y = 375;
+  const y = 490;
 
   const barWidth = 190;
   const barHeight = 8;
-  const gap = 20;
+  const gap = 17;
+
+  const values = [
+    getAudioControlValue("amplitude"),
+
+    lowControl,
+
+    middleControl,
+
+    highControl,
+
+    centroidControl,
+
+    fluxControl,
+  ];
 
   push();
 
   noStroke();
 
-  // Six meter backgrounds:
-  //
-  // 0 = amplitude
-  // 1 = low
-  // 2 = middle
-  // 3 = high
-  // 4 = spectral centroid
-  // 5 = spectral flux
-
+  // Background bars
   fill(40);
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < values.length; i++) {
     rect(x, y + i * gap, barWidth, barHeight);
   }
 
+  // Control values
   fill(255);
 
-  // Amplitude is multiplied only for HUD visualization.
-  // The raw measurement itself remains unchanged.
+  for (let i = 0; i < values.length; i++) {
+    rect(
+      x,
+      y + i * gap,
 
-  rect(x, y, barWidth * constrain(audioLevel * 4, 0, 1), barHeight);
+      barWidth * constrain(values[i], 0, 1),
 
-  rect(x, y + gap, barWidth * lowControl, barHeight);
-
-  rect(x, y + gap * 2, barWidth * middleControl, barHeight);
-
-  rect(x, y + gap * 3, barWidth * highControl, barHeight);
-
-  rect(x, y + gap * 4, barWidth * spectralCentroid, barHeight);
-
-  rect(x, y + gap * 5, barWidth * fluxControl, barHeight);
+      barHeight,
+    );
+  }
 
   pop();
 }
 
 // =========================================================
-// TEMPORAL RESET
+// RESET
 // =========================================================
 
-function resetTemporalSnapshots() {
+function resetSystemVisuals() {
+  initializeString();
+
+  const initialPoints = buildLineFromString(currentString);
+
+  previousPoints = copyPoints(initialPoints);
+
+  targetPoints = copyPoints(initialPoints);
+
   temporalSnapshots = [];
 
-  lastSnapshotTime = millis();
+  resetAudioHistory();
 
   if (signalLayer) {
     signalLayer.clear();
   }
+
+  const now = millis();
+
+  lastGenerationTime = now;
+
+  lastSnapshotTime = now;
+
+  lastAudioHistoryTime = now;
 }
 
 // =========================================================
 // KEYBOARD CONTROLS
 // =========================================================
 //
-// SPACE = pause/resume L-system generations
-// P     = play/pause audio
-// R     = reset L-system + temporal visualization
-//
-// Audio playback and L-system evolution remain separate
-// controls so the subsystems can still be inspected during
-// development.
+// SPACE = master play / pause
+// H     = hold to show HUD
+// R     = reset generative visual state
 //
 // =========================================================
 
 async function keyPressed() {
   // -------------------------------------------------------
-  // SPACE
-  // Pause/resume symbolic evolution.
+  // MASTER PLAY / PAUSE
   // -------------------------------------------------------
 
   if (key === " ") {
-    isPaused = !isPaused;
+    await toggleSystemPlayback();
 
     return false;
   }
 
   // -------------------------------------------------------
-  // P
-  // Play/pause MP3.
+  // HUD
   // -------------------------------------------------------
 
-  if (key === "p" || key === "P") {
-    if (!song) {
-      return false;
-    }
-
-    if (song.isPlaying()) {
-      song.pause();
-    } else {
-      await userStartAudio();
-
-      song.play();
-
-      // Avoid immediately capturing a snapshot whose timer
-      // has been accumulating during the paused period.
-      lastSnapshotTime = millis();
-    }
+  if (key === "h" || key === "H") {
+    showHUD = true;
 
     return false;
   }
 
   // -------------------------------------------------------
-  // R
-  // Reset the generative visual state.
-  //
-  // Audio playback itself is intentionally not restarted.
+  // RESET
   // -------------------------------------------------------
 
   if (key === "r" || key === "R") {
-    initializeString();
+    resetSystemVisuals();
 
-    const initialPoints = buildLineFromString(currentString);
+    return false;
+  }
+}
 
-    previousPoints = copyPoints(initialPoints);
-
-    targetPoints = copyPoints(initialPoints);
-
-    lastGenerationTime = millis();
-
-    resetTemporalSnapshots();
+function keyReleased() {
+  if (key === "h" || key === "H") {
+    showHUD = false;
 
     return false;
   }
