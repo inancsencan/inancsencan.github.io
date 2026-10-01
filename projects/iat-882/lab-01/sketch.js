@@ -103,18 +103,20 @@ const DEFAULT_LINE_WEIGHT = 3;
 const MIN_LINE_WEIGHT = 1;
 const MAX_LINE_WEIGHT = 8;
 
-// Cyan -> Magenta
-const CYAN = {
+let startColor = {
   r: 0,
   g: 255,
   b: 255,
 };
 
-const MAGENTA = {
+let endColor = {
   r: 255,
   g: 0,
   b: 255,
 };
+
+let thicknessMultiplier = 1;
+let snapshotFadeDuration = 1.5;
 
 // ---------------------------------------------------------
 // Temporal snapshot visualization
@@ -125,8 +127,6 @@ const SNAPSHOT_INTERVAL = 100; // ms
 const SNAPSHOT_SPEED = 120; // px / second
 
 const SNAPSHOT_START_ALPHA = 105;
-
-const SNAPSHOT_FADE_RATE = 70; // alpha / second
 
 const MAX_SNAPSHOTS = 20;
 
@@ -499,6 +499,34 @@ function setupControls() {
 
   const colorSelect = document.getElementById("color-source");
 
+  const fadeDurationSlider = document.getElementById("fade-duration");
+
+  const fadeDurationValue = document.getElementById("fade-duration-value");
+
+  snapshotFadeDuration = Number(fadeDurationSlider.value);
+
+  fadeDurationSlider.addEventListener("input", function () {
+    snapshotFadeDuration = Number(this.value);
+
+    fadeDurationValue.textContent = snapshotFadeDuration.toFixed(1) + " s";
+  });
+
+  const startColorPicker = document.getElementById("color-start");
+
+  const endColorPicker = document.getElementById("color-end");
+
+  startColor = hexToRgb(startColorPicker.value);
+
+  endColor = hexToRgb(endColorPicker.value);
+
+  startColorPicker.addEventListener("input", function () {
+    startColor = hexToRgb(this.value);
+  });
+
+  endColorPicker.addEventListener("input", function () {
+    endColor = hexToRgb(this.value);
+  });
+
   ruleControlSource = ruleSelect.value;
 
   timingControlSource = timingSelect.value;
@@ -508,6 +536,22 @@ function setupControls() {
   thicknessControlSource = thicknessSelect.value;
 
   colorControlSource = colorSelect.value;
+
+  const thicknessMultiplierSlider = document.getElementById(
+    "thickness-multiplier",
+  );
+
+  const thicknessMultiplierValue = document.getElementById(
+    "thickness-multiplier-value",
+  );
+
+  thicknessMultiplier = Number(thicknessMultiplierSlider.value);
+
+  thicknessMultiplierSlider.addEventListener("input", function () {
+    thicknessMultiplier = Number(this.value);
+
+    thicknessMultiplierValue.textContent = thicknessMultiplier.toFixed(1) + "×";
+  });
 
   ruleSelect.addEventListener("change", function () {
     ruleControlSource = this.value;
@@ -1309,44 +1353,48 @@ function renderSignalLayer(points) {
 // =========================================================
 
 function getSpatialLineWeight(position) {
-  if (thicknessControlSource === "none") {
-    return DEFAULT_LINE_WEIGHT;
+  let baseWeight = DEFAULT_LINE_WEIGHT;
+
+  if (thicknessControlSource !== "none") {
+    const value = getAudioHistoryValue(thicknessControlSource, position);
+
+    baseWeight = lerp(MIN_LINE_WEIGHT, MAX_LINE_WEIGHT, value);
   }
 
-  const value = getAudioHistoryValue(thicknessControlSource, position);
-
-  return lerp(MIN_LINE_WEIGHT, MAX_LINE_WEIGHT, value);
+  return baseWeight * thicknessMultiplier;
 }
 
 // =========================================================
 // SPATIAL COLOR
 // =========================================================
-//
-// None:
-//   constant cyan.
-//
-// Audio source:
-//   value 0 -> cyan
-//   value 1 -> magenta
-//
-// Audio history creates a smooth spatial gradient rather than
-// changing the entire line to one color simultaneously.
-//
+
+function hexToRgb(hex) {
+  const value = hex.replace("#", "");
+
+  return {
+    r: parseInt(value.substring(0, 2), 16),
+
+    g: parseInt(value.substring(2, 4), 16),
+
+    b: parseInt(value.substring(4, 6), 16),
+  };
+}
+
 // =========================================================
 
 function getSpatialLineColor(position) {
   if (colorControlSource === "none") {
-    return CYAN;
+    return startColor;
   }
 
   const value = getAudioHistoryValue(colorControlSource, position);
 
   return {
-    r: lerp(CYAN.r, MAGENTA.r, value),
+    r: lerp(startColor.r, endColor.r, value),
 
-    g: lerp(CYAN.g, MAGENTA.g, value),
+    g: lerp(startColor.g, endColor.g, value),
 
-    b: lerp(CYAN.b, MAGENTA.b, value),
+    b: lerp(startColor.b, endColor.b, value),
   };
 }
 
@@ -1383,10 +1431,12 @@ function captureSignalSnapshot() {
 function updateTemporalSnapshots() {
   const seconds = deltaTime / 1000;
 
+  const fadeRate = SNAPSHOT_START_ALPHA / snapshotFadeDuration;
+
   for (const snapshot of temporalSnapshots) {
     snapshot.offset += SNAPSHOT_SPEED * seconds;
 
-    snapshot.alpha -= SNAPSHOT_FADE_RATE * seconds;
+    snapshot.alpha -= fadeRate * seconds;
   }
 
   temporalSnapshots = temporalSnapshots.filter(
@@ -1682,7 +1732,7 @@ async function keyPressed() {
   // MASTER PLAY / PAUSE
   // -------------------------------------------------------
 
-  if (key === " ") {
+  if (key === "P" || key === "p" || keyCode === 32) {
     await toggleSystemPlayback();
 
     return false;

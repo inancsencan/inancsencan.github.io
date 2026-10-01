@@ -99,6 +99,48 @@
             <option value="flux">Flux</option>
           </select>
         </div>
+
+        <div class="control-row">
+          <label for="thickness-multiplier"> Thickness Multiplier </label>
+
+          <input
+            id="thickness-multiplier"
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value="1"
+          />
+
+          <span id="thickness-multiplier-value">1.0×</span>
+        </div>
+
+        <div class="control-row">
+          <label for="fade-duration"> Fade Duration </label>
+
+          <input
+            id="fade-duration"
+            type="range"
+            min="0.5"
+            max="6"
+            step="0.1"
+            value="1.5"
+          />
+
+          <span id="fade-duration-value">1.5 s</span>
+        </div>
+
+        <div class="control-row">
+          <label for="color-start"> Start Color </label>
+
+          <input id="color-start" type="color" value="#00ffff" />
+        </div>
+
+        <div class="control-row">
+          <label for="color-end"> End Color </label>
+
+          <input id="color-end" type="color" value="#ff00ff" />
+        </div>
       </section>
 
       <div id="sketch-holder"></div>
