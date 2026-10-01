@@ -1,0 +1,4 @@
+Libraries
+- p5.js 2.3.3
+- p5.sound 0.4.1
+Both libraries are loaded from a CDN in index.html, so no package installation is required.

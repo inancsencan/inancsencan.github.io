@@ -1,0 +1,1 @@
+Outputs are generated through playing with the visualization parameters and audio mapping parameters. The values used for the samples are provided in the screenshots. Default audio was used, which is included in the repository.
