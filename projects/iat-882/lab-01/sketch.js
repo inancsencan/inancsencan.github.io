@@ -21,6 +21,19 @@ let targetPoints = [];
 let isPaused = false;
 
 // -------------------------
+// AUDIO
+// -------------------------
+
+let song;
+let fft;
+let amplitude;
+
+let audioLevel = 0;
+let bassEnergy = 0;
+let midEnergy = 0;
+let trebleEnergy = 0;
+
+// -------------------------
 // STOCHASTIC RULES
 // -------------------------
 
@@ -58,24 +71,91 @@ const rules = {
 // SETUP
 // -------------------------
 
-function setup() {
+async function setup() {
   const canvas = createCanvas(900, 600);
   canvas.parent("sketch-holder");
 
   baselineY = height / 2;
 
+  // Load audio
+  song = await loadSound("audio/track.mp3");
+
+  // Audio analyzers
+  fft = new p5.FFT(1024);
+  amplitude = new p5.Amplitude(0.8);
+
+  song.connect(fft);
+  song.connect(amplitude);
+
+  // L-system
   initializeString();
 
   let initialPoints = buildLineFromString(currentString);
 
   previousPoints = copyPoints(initialPoints);
+
   targetPoints = copyPoints(initialPoints);
 
   saveHistory(initialPoints);
 
   lastGenerationTime = millis();
 
+  console.log("Audio loaded:", song);
   console.log("Initial string:", currentString);
+}
+
+// -------------------------
+// AUDIO ANALYSIS
+// -------------------------
+
+function analyzeAudio() {
+  if (!song || !song.isPlaying()) {
+    audioLevel = 0;
+    bassEnergy = 0;
+    midEnergy = 0;
+    trebleEnergy = 0;
+    return;
+  }
+
+  let spectrum = fft.analyze();
+
+  audioLevel = amplitude.getLevel();
+
+  bassEnergy = getBandEnergy(spectrum, 20, 250);
+
+  midEnergy = getBandEnergy(spectrum, 250, 4000);
+
+  trebleEnergy = getBandEnergy(spectrum, 4000, 12000);
+}
+
+// -------------------------
+// HELPER FUNCTIONS
+// -------------------------
+function getBandEnergy(spectrum, minFrequency, maxFrequency) {
+  let audioContext = getAudioContext();
+  let nyquist = audioContext.sampleRate / 2;
+
+  let startIndex = floor(map(minFrequency, 0, nyquist, 0, spectrum.length));
+
+  let endIndex = floor(map(maxFrequency, 0, nyquist, 0, spectrum.length));
+
+  startIndex = constrain(startIndex, 0, spectrum.length - 1);
+
+  endIndex = constrain(endIndex, 0, spectrum.length - 1);
+
+  let total = 0;
+  let count = 0;
+
+  for (let i = startIndex; i <= endIndex; i++) {
+    total += spectrum[i];
+    count++;
+  }
+
+  if (count === 0) {
+    return 0;
+  }
+
+  return total / count;
 }
 
 // -------------------------
@@ -99,6 +179,8 @@ function initializeString() {
 
 function draw() {
   background(0);
+
+  analyzeAudio();
 
   if (!isPaused) {
     if (millis() - lastGenerationTime >= generationInterval) {
@@ -128,6 +210,7 @@ function draw() {
   }
 
   drawHUD();
+  drawAudioMeters();
 }
 
 // -------------------------
@@ -432,6 +515,58 @@ function drawHUD() {
 
   text(currentString, 20, 80);
 
+  text("Audio: " + (song.isPlaying() ? "PLAYING" : "PAUSED"), 20, 120);
+
+  text("Amplitude: " + nf(audioLevel, 1, 3), 20, 145);
+
+  text("Bass: " + nf(bassEnergy, 1, 3), 20, 170);
+
+  text("Mid: " + nf(midEnergy, 1, 3), 20, 195);
+
+  text("Treble: " + nf(trebleEnergy, 1, 3), 20, 220);
+
+  pop();
+}
+
+// -------------------------
+// DRAW AUDIO METERS
+// -------------------------
+
+function drawAudioMeters() {
+  let x = 20;
+  let y = 245;
+
+  let barWidth = 160;
+  let barHeight = 8;
+  let gap = 18;
+
+  push();
+
+  noStroke();
+
+  // background bars
+  fill(40);
+
+  for (let i = 0; i < 4; i++) {
+    rect(x, y + i * gap, barWidth, barHeight);
+  }
+
+  // amplitude
+  fill(255);
+  rect(x, y, barWidth * constrain(audioLevel * 4, 0, 1), barHeight);
+
+  // bass
+  fill(255);
+  rect(x, y + gap, barWidth * bassEnergy, barHeight);
+
+  // mid
+  fill(255);
+  rect(x, y + gap * 2, barWidth * midEnergy, barHeight);
+
+  // treble
+  fill(255);
+  rect(x, y + gap * 3, barWidth * trebleEnergy, barHeight);
+
   pop();
 }
 
@@ -439,10 +574,24 @@ function drawHUD() {
 // CONTROLS
 // -------------------------
 
-function keyPressed() {
+async function keyPressed() {
   // SPACE
   if (key === " ") {
     isPaused = !isPaused;
+
+    return false;
+  }
+
+  // PLAY / PAUSE
+  if (key === "p" || key === "P") {
+    if (!song) return false;
+
+    if (song.isPlaying()) {
+      song.pause();
+    } else {
+      await userStartAudio();
+      song.play();
+    }
 
     return false;
   }
