@@ -1,6 +1,6 @@
 // =========================================================
 // SIGNAL MACHINE
-// Audio analysis + stochastic L-system visualizer
+// Audio-reactive stochastic L-system visualizer
 // =========================================================
 //
 // SYSTEM OVERVIEW
@@ -12,16 +12,27 @@
 //    a horizontal signal line across the canvas.
 //
 // 3. Consecutive L-system generations are interpolated so the
-//    visual form morphs smoothly instead of jumping instantly.
+//    current signal morphs smoothly instead of jumping.
 //
-// 4. Previous generations are stored as visual history and
-//    drawn above and below the current signal as fading echoes.
+// 4. The current signal is rendered to an offscreen graphics
+//    layer. Periodic snapshots of that rendered layer are
+//    captured and moved upward and downward while fading.
 //
-// 5. An MP3 file is analyzed independently using amplitude,
-//    frequency-band energy, spectral centroid, and spectral flux.
+//    This temporal visualization is independent of the
+//    L-system generation history. It stores rendered visual
+//    states rather than symbolic generation states.
 //
-// 6. Audio features are currently displayed for debugging.
-//    They will later modify the stochastic rule probabilities.
+// 5. An MP3 file is analyzed using amplitude, frequency-band
+//    energy, spectral centroid, and spectral flux.
+//
+// 6. Spectral flux currently controls the amount of
+//    stochasticity in the L-system.
+//
+//    No audio:
+//      deterministic A-only rewriting.
+//
+//    Stronger flux:
+//      increasingly stochastic rewriting.
 //
 // =========================================================
 
@@ -29,42 +40,95 @@
 // CONFIGURATION
 // =========================================================
 
-// For the first prototype, spectral flux controls how
-// stochastic the L-system is.
+// ---------------------------------------------------------
+// Rule-control prototype
+// ---------------------------------------------------------
 //
-// Later this value will come from a user-selected dropdown.
+// Later this will be replaced by a user-selectable mapping.
+// For now, normalized spectral flux controls stochasticity.
+
 const RULE_CONTROL_SOURCE = "flux";
 
+// ---------------------------------------------------------
 // Canvas
+// ---------------------------------------------------------
+
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
 
+// ---------------------------------------------------------
 // L-system
+// ---------------------------------------------------------
+
 const INITIAL_STRING_LENGTH = 32;
+
+// New symbolic generations are produced at this interval.
+// Rendering still happens every visual frame.
 const GENERATION_INTERVAL = 300; // milliseconds
 
+// ---------------------------------------------------------
 // Symbol-to-line mapping
+// ---------------------------------------------------------
+
 const UP_OFFSET = -90;
 const DOWN_OFFSET = 90;
 const QUIET_OFFSET = 25;
+
+// Smooths neighboring symbolic target heights before the
+// separate geometric smoothing stage.
 const SYMBOL_INTERPOLATION = 0.65;
 
-// Visual history
-const MAX_HISTORY = 16;
-const HISTORY_SPACING = 14;
-const HISTORY_NEAR_ALPHA = 95;
-const HISTORY_FAR_ALPHA = 5;
-
+// ---------------------------------------------------------
 // Geometric smoothing
+// ---------------------------------------------------------
+
 const SMOOTHING_ITERATIONS = 2;
 
+// ---------------------------------------------------------
+// Temporal snapshot visualization
+// ---------------------------------------------------------
+//
+// The current signal is rendered into an offscreen layer.
+// A snapshot of that layer is periodically captured.
+//
+// Each snapshot is then drawn twice:
+//   one copy moves upward,
+//   one copy moves downward.
+//
+// Both copies fade as they move away from the center.
+//
+// Because snapshots contain the already-rendered signal,
+// future visual changes to the signal automatically become
+// part of the temporal visualization.
+
+const SNAPSHOT_INTERVAL = 100; // milliseconds
+
+// Movement speed in pixels per second.
+const SNAPSHOT_SPEED = 120;
+
+// Alpha when a snapshot is first created.
+const SNAPSHOT_START_ALPHA = 105;
+
+// Alpha removed per second.
+const SNAPSHOT_FADE_RATE = 70;
+
+// Safety limit to prevent excessive image memory use.
+const MAX_SNAPSHOTS = 20;
+
+// ---------------------------------------------------------
 // Audio analysis
+// ---------------------------------------------------------
+
 const FFT_SIZE = 1024;
 const AMPLITUDE_SMOOTHING = 0.8;
 
-// Frequency bands.
-// These deliberately cover broad low, middle, and high regions
-// rather than being designed for one particular musical genre.
+// ---------------------------------------------------------
+// Frequency bands
+// ---------------------------------------------------------
+//
+// Broad frequency regions are used so the analyzer is not
+// designed around one particular musical genre.
+
 const LOW_MIN_HZ = 50;
 const LOW_MAX_HZ = 250;
 
@@ -74,9 +138,13 @@ const MIDDLE_MAX_HZ = 1200;
 const HIGH_MIN_HZ = 1200;
 const HIGH_MAX_HZ = 4000;
 
-// Adaptive normalization.
-// Peak values decay slowly so different tracks can produce
-// comparable 0–1 control signals without fixed gain values.
+// ---------------------------------------------------------
+// Adaptive audio normalization
+// ---------------------------------------------------------
+//
+// Peaks slowly decay so tracks with very different spectral
+// balances can still produce useful relative 0–1 controls.
+
 const BAND_PEAK_DECAY = 0.995;
 const BAND_CONTROL_SMOOTHING = 0.15;
 
@@ -100,10 +168,28 @@ let isPaused = false;
 
 let baselineY;
 
+// Two symbolic-generation shapes are stored so the visible
+// signal can smoothly interpolate between them.
 let previousPoints = [];
 let targetPoints = [];
 
-let history = [];
+// ---------------------------------------------------------
+// Offscreen signal layer
+// ---------------------------------------------------------
+//
+// Only the current signal is drawn here.
+//
+// HUD, controls, and debug graphics remain on the main canvas
+// so they do not become part of temporal snapshots.
+
+let signalLayer;
+
+// ---------------------------------------------------------
+// Temporal snapshots
+// ---------------------------------------------------------
+
+let temporalSnapshots = [];
+let lastSnapshotTime = 0;
 
 // =========================================================
 // AUDIO STATE
@@ -113,32 +199,53 @@ let song;
 let fft;
 let amplitude;
 
+// ---------------------------------------------------------
 // Overall loudness
+// ---------------------------------------------------------
+
 let audioLevel = 0;
 
+// ---------------------------------------------------------
 // Raw frequency-band energy
+// ---------------------------------------------------------
+
 let lowEnergy = 0;
 let middleEnergy = 0;
 let highEnergy = 0;
 
-// Normalized 0–1 values used as potential generative controls
+// ---------------------------------------------------------
+// Normalized frequency controls
+// ---------------------------------------------------------
+//
+// These are relative 0–1 values intended for later
+// generative mappings.
+
 let lowControl = 0;
 let middleControl = 0;
 let highControl = 0;
 
-// Running peaks used for adaptive normalization
+// ---------------------------------------------------------
+// Adaptive band peaks
+// ---------------------------------------------------------
+
 let lowPeak = 0.001;
 let middlePeak = 0.001;
 let highPeak = 0.001;
 
+// ---------------------------------------------------------
 // Spectral features
+// ---------------------------------------------------------
+
 let spectralCentroid = 0;
 let spectralFlux = 0;
 
-// Previous FFT frame is required to calculate spectral change
+// Previous FFT frame is required to measure spectral change.
 let previousSpectrum = [];
 
-// Normalized spectral-flux control
+// ---------------------------------------------------------
+// Spectral-flux control
+// ---------------------------------------------------------
+
 let fluxControl = 0;
 let fluxPeak = 0.0001;
 
@@ -146,20 +253,33 @@ let fluxPeak = 0.0001;
 // STOCHASTIC L-SYSTEM RULES
 // =========================================================
 //
-// Every input symbol produces exactly one output symbol.
-// Therefore, unlike many conventional L-systems, the string
-// length remains constant across generations.
+// Every symbol rewrites into exactly one symbol.
 //
-// The system still evolves because each rewrite is selected
-// probabilistically.
+// Therefore the string remains the same length across
+// generations. This avoids exponential growth while still
+// allowing the symbolic state to evolve continuously.
+//
+// Visual meanings:
 //
 // A = neutral / baseline tendency
 // B = upward tendency
 // C = downward tendency
 // D = quieter / small downward tendency
 //
-// At this stage these probabilities are fixed.
-// Later, audio features will bias these weights dynamically.
+// These weights represent the system at maximum
+// stochasticity.
+//
+// The active weights are dynamically interpolated between:
+//
+//   deterministic:
+//     A = 1
+//     B = 0
+//     C = 0
+//     D = 0
+//
+// and:
+//
+//   the stochastic distributions below.
 //
 // =========================================================
 
@@ -205,23 +325,29 @@ async function setup() {
   baselineY = height / 2;
 
   // -------------------------------------------------------
-  // Load and connect the audio source.
+  // Create the offscreen visual layer.
+  // -------------------------------------------------------
   //
-  // p5.sound 0.4.x uses an asynchronous loading workflow,
-  // so setup waits until the MP3 is available before creating
-  // the analyzers.
+  // p5.Graphics uses a transparent background by default.
+  // We clear it every frame and draw only the current signal.
+
+  signalLayer = createGraphics(width, height);
+
+  // -------------------------------------------------------
+  // Load and connect audio.
   // -------------------------------------------------------
 
   song = await loadSound("audio/track.mp3");
 
   fft = new p5.FFT(FFT_SIZE);
+
   amplitude = new p5.Amplitude(AMPLITUDE_SMOOTHING);
 
   song.connect(fft);
   song.connect(amplitude);
 
   // -------------------------------------------------------
-  // Initialize the first L-system state.
+  // Initialize the L-system.
   // -------------------------------------------------------
 
   initializeString();
@@ -229,13 +355,15 @@ async function setup() {
   const initialPoints = buildLineFromString(currentString);
 
   previousPoints = copyPoints(initialPoints);
-  targetPoints = copyPoints(initialPoints);
 
-  saveHistory(initialPoints);
+  targetPoints = copyPoints(initialPoints);
 
   lastGenerationTime = millis();
 
+  lastSnapshotTime = millis();
+
   console.log("Audio loaded:", song);
+
   console.log("Initial string:", currentString);
 }
 
@@ -246,16 +374,69 @@ async function setup() {
 function draw() {
   background(0);
 
-  // Audio analysis runs every visual frame.
-  // The L-system itself evolves at the slower generation rate.
+  // -------------------------------------------------------
+  // 1. Analyze audio every visual frame.
+  // -------------------------------------------------------
+
   analyzeAudio();
+
+  // -------------------------------------------------------
+  // 2. Update symbolic generation when its timer expires.
+  // -------------------------------------------------------
 
   updateGeneration();
 
-  drawBaseline();
-  drawHistory();
+  // -------------------------------------------------------
+  // 3. Calculate the smoothly interpolated current signal.
+  // -------------------------------------------------------
 
-  drawInterpolatedSignal();
+  const displayPoints = getInterpolatedSignalPoints();
+
+  // -------------------------------------------------------
+  // 4. Render current signal to offscreen layer.
+  // -------------------------------------------------------
+
+  renderSignalLayer(displayPoints);
+
+  // -------------------------------------------------------
+  // 5. Capture temporal snapshots when appropriate.
+  // -------------------------------------------------------
+
+  updateSnapshotCapture();
+
+  // -------------------------------------------------------
+  // 6. Advance all stored snapshots every visual frame.
+  // -------------------------------------------------------
+
+  updateTemporalSnapshots();
+
+  // -------------------------------------------------------
+  // 7. Draw temporal echoes first so the current signal
+  //    remains visually dominant.
+  // -------------------------------------------------------
+
+  drawTemporalSnapshots();
+
+  // -------------------------------------------------------
+  // 8. Draw fixed center reference line.
+  //
+  //    The baseline intentionally does NOT belong to the
+  //    snapshot layer, so it remains stationary.
+  // -------------------------------------------------------
+
+  drawBaseline();
+
+  // -------------------------------------------------------
+  // 9. Draw the live signal at the center.
+  // -------------------------------------------------------
+
+  image(signalLayer, 0, 0);
+
+  // -------------------------------------------------------
+  // 10. Draw interface/debug information last.
+  //
+  //     HUD graphics never enter the snapshot system.
+  // -------------------------------------------------------
 
   drawHUD();
   drawAudioMeters();
@@ -266,12 +447,12 @@ function draw() {
 // =========================================================
 
 function analyzeAudio() {
-  // When no audio is playing, visible/control values return
-  // to zero rather than freezing at their previous values.
+  // When audio is not playing, current analysis/control
+  // values return to zero.
   //
-  // Running peak values are intentionally preserved so
-  // pausing and resuming does not completely recalibrate
-  // the analyzer.
+  // Peak calibration is intentionally preserved so pause /
+  // resume does not reset normalization every time.
+
   if (!song || !song.isPlaying()) {
     audioLevel = 0;
 
@@ -285,6 +466,7 @@ function analyzeAudio() {
 
     spectralCentroid = 0;
     spectralFlux = 0;
+
     fluxControl = 0;
 
     previousSpectrum = [];
@@ -302,11 +484,11 @@ function analyzeAudio() {
 
   // -------------------------------------------------------
   // Frequency-band energy
-  //
-  // Band energy is measured using RMS rather than a simple
-  // arithmetic mean. This gives stronger spectral components
-  // more influence instead of diluting them across the band.
   // -------------------------------------------------------
+  //
+  // RMS is used instead of a simple arithmetic mean.
+  // Strong spectral components therefore retain more
+  // influence within each frequency region.
 
   lowEnergy = getBandEnergy(spectrum, LOW_MIN_HZ, LOW_MAX_HZ);
 
@@ -318,24 +500,23 @@ function analyzeAudio() {
 
   // -------------------------------------------------------
   // Spectral centroid
-  //
-  // Describes the frequency "center of gravity" of the
-  // spectrum. Higher values generally correspond to a
-  // spectrum weighted more strongly toward high frequencies.
-  //
-  // The result is currently normalized against the Nyquist
-  // frequency and is kept primarily as a diagnostic value.
   // -------------------------------------------------------
+  //
+  // Measures the spectrum's frequency center of gravity.
+  // Higher values generally indicate more high-frequency
+  // spectral emphasis.
 
   spectralCentroid = calculateSpectralCentroid(spectrum);
 
   // -------------------------------------------------------
   // Spectral flux
-  //
-  // Measures positive spectral change between consecutive
-  // FFT frames. It can respond to transients, note attacks,
-  // rhythmic events, and other sudden spectral changes.
   // -------------------------------------------------------
+  //
+  // Measures positive spectral change relative to the
+  // previous FFT frame.
+  //
+  // It can react to attacks, transitions, rhythmic events,
+  // and other sudden changes in spectral content.
 
   spectralFlux = calculateSpectralFlux(spectrum, previousSpectrum);
 
@@ -349,30 +530,26 @@ function analyzeAudio() {
 // =========================================================
 
 function updateBandControls() {
-  // Slowly reduce the stored peaks.
-  //
-  // This adaptive normalization allows tracks with very
-  // different spectral balances and mastering levels to
-  // produce useful relative control values.
+  // Slowly forget old peaks.
   lowPeak *= BAND_PEAK_DECAY;
   middlePeak *= BAND_PEAK_DECAY;
   highPeak *= BAND_PEAK_DECAY;
 
-  // Store new peaks whenever the current frame exceeds
-  // the decayed previous maximum.
+  // Store stronger recent peaks.
   lowPeak = max(lowPeak, lowEnergy);
+
   middlePeak = max(middlePeak, middleEnergy);
+
   highPeak = max(highPeak, highEnergy);
 
-  // Convert raw measurements to relative 0–1 targets.
+  // Convert raw measurements into relative 0–1 targets.
   const targetLow = constrain(lowEnergy / lowPeak, 0, 1);
 
   const targetMiddle = constrain(middleEnergy / middlePeak, 0, 1);
 
   const targetHigh = constrain(highEnergy / highPeak, 0, 1);
 
-  // Smooth the controls so rapid FFT fluctuations do not
-  // produce excessive jitter in later generative mappings.
+  // Smooth the control signals to reduce frame-level jitter.
   lowControl = lerp(lowControl, targetLow, BAND_CONTROL_SMOOTHING);
 
   middleControl = lerp(middleControl, targetMiddle, BAND_CONTROL_SMOOTHING);
@@ -381,8 +558,9 @@ function updateBandControls() {
 }
 
 function updateFluxControl() {
-  // Flux is also normalized adaptively because its raw
-  // magnitude depends strongly on the source material.
+  // Flux normalization follows the same adaptive-peak idea
+  // used by the frequency bands.
+
   fluxPeak *= FLUX_PEAK_DECAY;
 
   fluxPeak = max(fluxPeak, spectralFlux);
@@ -398,6 +576,7 @@ function updateFluxControl() {
 
 function getBandEnergy(spectrum, minFrequency, maxFrequency) {
   const audioContext = getAudioContext();
+
   const nyquist = audioContext.sampleRate / 2;
 
   let startIndex = floor(map(minFrequency, 0, nyquist, 0, spectrum.length));
@@ -415,6 +594,7 @@ function getBandEnergy(spectrum, minFrequency, maxFrequency) {
     const value = spectrum[i];
 
     sumSquares += value * value;
+
     count++;
   }
 
@@ -422,12 +602,12 @@ function getBandEnergy(spectrum, minFrequency, maxFrequency) {
     return 0;
   }
 
-  // RMS energy
   return sqrt(sumSquares / count);
 }
 
 function calculateSpectralCentroid(spectrum) {
   const audioContext = getAudioContext();
+
   const nyquist = audioContext.sampleRate / 2;
 
   let weightedSum = 0;
@@ -449,13 +629,13 @@ function calculateSpectralCentroid(spectrum) {
 
   const centroidHz = weightedSum / magnitudeSum;
 
-  // Normalize frequency position to 0–1.
+  // Normalize position within the available spectrum.
   return constrain(centroidHz / nyquist, 0, 1);
 }
 
 function calculateSpectralFlux(spectrum, previous) {
-  // Flux cannot be calculated until a previous FFT frame
-  // of the same size exists.
+  // Flux requires a previous FFT frame of equal length.
+
   if (previous.length !== spectrum.length) {
     return 0;
   }
@@ -466,8 +646,11 @@ function calculateSpectralFlux(spectrum, previous) {
   for (let i = 0; i < spectrum.length; i++) {
     const difference = spectrum[i] - previous[i];
 
-    // Only increases in spectral energy are counted.
-    // This emphasizes new spectral events rather than decay.
+    // Count only increases in spectral energy.
+    //
+    // This emphasizes newly appearing spectral events
+    // rather than ordinary decay.
+
     if (difference > 0) {
       sumSquares += difference * difference;
 
@@ -487,7 +670,6 @@ function calculateSpectralFlux(spectrum, previous) {
 // =========================================================
 
 function initializeString() {
-  history = [];
   currentString = "";
 
   for (let i = 0; i < INITIAL_STRING_LENGTH; i++) {
@@ -518,11 +700,16 @@ function updateGeneration() {
 function generateNextGeneration() {
   let nextString = "";
 
-  // Parallel rewriting:
+  // -------------------------------------------------------
+  // Parallel rewriting
+  // -------------------------------------------------------
   //
   // Every symbol is read from the OLD generation and written
-  // into a separate new string. Newly produced symbols cannot
-  // be rewritten again during the same generation.
+  // into a separate new string.
+  //
+  // Newly produced symbols therefore cannot be rewritten
+  // again during the same generation.
+
   for (let i = 0; i < currentString.length; i++) {
     const currentSymbol = currentString[i];
 
@@ -530,17 +717,14 @@ function generateNextGeneration() {
   }
 
   currentString = nextString;
+
   generationCount++;
 
-  // The previous target becomes the starting shape for the
-  // visual transition toward the newly generated form.
+  // The old target becomes the start of the visual morph.
   previousPoints = copyPoints(targetPoints);
 
+  // Build the geometry for the new symbolic generation.
   targetPoints = buildLineFromString(currentString);
-
-  // History stores true generation states, not intermediate
-  // animation frames.
-  saveHistory(targetPoints);
 
   console.log("Generation", generationCount, currentString);
 }
@@ -563,19 +747,24 @@ function rewriteSymbol(symbol) {
   return weightedChoice(dynamicOptions);
 }
 
-function getRuleProbabilityControl() {
-  // First prototype:
-  // spectral flux controls stochasticity.
-  //
-  // Later this function will return whichever
-  // audio feature the user selects in the UI.
+// ---------------------------------------------------------
+// Current mapping prototype
+// ---------------------------------------------------------
+//
+// Later this function will read the user's selected audio
+// feature from the interface.
 
+function getRuleProbabilityControl() {
   if (RULE_CONTROL_SOURCE === "flux") {
     return fluxControl;
   }
 
   return 0;
 }
+
+// ---------------------------------------------------------
+// Deterministic -> stochastic interpolation
+// ---------------------------------------------------------
 
 function createDynamicRuleWeights(baseOptions, controlValue) {
   const dynamicOptions = [];
@@ -584,14 +773,15 @@ function createDynamicRuleWeights(baseOptions, controlValue) {
 
   for (const option of baseOptions) {
     // Deterministic state:
-    // A has probability 1.
-    // Every other symbol has probability 0.
+    //
+    // A = 100%
+    // everything else = 0%
+
     const deterministicWeight = option.symbol === "A" ? 1 : 0;
 
-    // Interpolate between:
-    //
-    // control = 0 → deterministic A-only system
-    // control = 1 → original stochastic rule weights
+    // Audio control continuously interpolates between the
+    // deterministic state and the predefined stochastic rule.
+
     const dynamicWeight = lerp(deterministicWeight, option.weight, amount);
 
     dynamicOptions.push({
@@ -622,8 +812,7 @@ function weightedChoice(options) {
     }
   }
 
-  // Numerical fallback in case floating-point precision
-  // prevents a previous comparison from succeeding.
+  // Floating-point safety fallback.
   return options[options.length - 1].symbol;
 }
 
@@ -634,9 +823,9 @@ function weightedChoice(options) {
 function buildLineFromString(sequence) {
   const points = [];
 
-  // Because the first point starts at x = 0 and the final
-  // point ends at x = width, the signal always spans the
-  // entire canvas horizontally.
+  // First point begins at x = 0.
+  // Final point ends at x = width.
+
   const xStep = width / max(1, sequence.length - 1);
 
   let currentY = baselineY;
@@ -662,9 +851,11 @@ function buildLineFromString(sequence) {
       targetY = baselineY + QUIET_OFFSET;
     }
 
-    // Neighboring symbol targets are partially interpolated.
-    // This prevents each symbolic state from becoming a hard
-    // independent vertical step.
+    // Partially approach each symbol's target.
+    //
+    // This provides local smoothing before Chaikin
+    // geometric smoothing is applied later.
+
     currentY = lerp(currentY, targetY, SYMBOL_INTERPOLATION);
 
     points.push({
@@ -678,30 +869,24 @@ function buildLineFromString(sequence) {
 }
 
 // =========================================================
-// GENERATION-TO-GENERATION ANIMATION
+// GENERATION-TO-GENERATION INTERPOLATION
 // =========================================================
 
-function drawInterpolatedSignal() {
+function getInterpolatedSignalPoints() {
   if (previousPoints.length === 0 || targetPoints.length === 0) {
-    return;
+    return [];
   }
 
   let progress = (millis() - lastGenerationTime) / GENERATION_INTERVAL;
 
   progress = constrain(progress, 0, 1);
 
-  // Smoothstep provides ease-in and ease-out so each new
-  // generation visually morphs into the next rather than
-  // changing abruptly.
+  // Smoothstep creates ease-in / ease-out motion between
+  // consecutive symbolic generations.
+
   progress = smoothStep(progress);
 
-  const displayPoints = interpolatePoints(
-    previousPoints,
-    targetPoints,
-    progress,
-  );
-
-  drawSignalLine(displayPoints);
+  return interpolatePoints(previousPoints, targetPoints, progress);
 }
 
 function interpolatePoints(fromPoints, toPoints, amount) {
@@ -728,11 +913,10 @@ function smoothStep(t) {
 // GEOMETRIC SMOOTHING
 // =========================================================
 //
-// Chaikin corner-cutting is applied only during rendering.
+// Chaikin corner-cutting is used only for rendering.
 //
-// It does NOT alter the L-system string or generation state.
-// The symbolic structure therefore remains discrete while
-// its visual interpretation becomes smoother.
+// The symbolic L-system state remains discrete and unchanged.
+// Smoothing therefore changes only its visual interpretation.
 //
 // =========================================================
 
@@ -742,7 +926,7 @@ function smoothPoints(points, iterations = SMOOTHING_ITERATIONS) {
   for (let iteration = 0; iteration < iterations; iteration++) {
     const newPoints = [];
 
-    // Preserve the first endpoint.
+    // Preserve first endpoint.
     newPoints.push({
       x: result[0].x,
       y: result[0].y,
@@ -750,15 +934,18 @@ function smoothPoints(points, iterations = SMOOTHING_ITERATIONS) {
 
     for (let i = 0; i < result.length - 1; i++) {
       const p1 = result[i];
+
       const p2 = result[i + 1];
 
       const q = {
         x: lerp(p1.x, p2.x, 0.25),
+
         y: lerp(p1.y, p2.y, 0.25),
       };
 
       const r = {
         x: lerp(p1.x, p2.x, 0.75),
+
         y: lerp(p1.y, p2.y, 0.75),
       };
 
@@ -766,7 +953,7 @@ function smoothPoints(points, iterations = SMOOTHING_ITERATIONS) {
       newPoints.push(r);
     }
 
-    // Preserve the final endpoint.
+    // Preserve final endpoint.
     const lastPoint = result[result.length - 1];
 
     newPoints.push({
@@ -799,67 +986,182 @@ function copyPoints(points) {
 }
 
 // =========================================================
-// GENERATION HISTORY
+// SIGNAL LAYER
+// =========================================================
+//
+// The live signal is rendered once into an offscreen layer.
+//
+// The same rendered layer is:
+//
+//   1. displayed as the current central signal,
+//   2. periodically copied into the temporal snapshot system.
+//
+// This means future changes to the signal's visual appearance
+// automatically propagate into new temporal snapshots.
+//
 // =========================================================
 
-function saveHistory(points) {
-  const snapshot = copyPoints(points);
+function renderSignalLayer(points) {
+  signalLayer.clear();
 
-  // Newest generation remains at index 0.
-  history.unshift(snapshot);
-
-  if (history.length > MAX_HISTORY) {
-    history.pop();
-  }
-}
-
-function drawHistory() {
-  // history[0] is the current target generation and is drawn
-  // separately as the main cyan signal.
-  //
-  // Older generations are mirrored upward and downward,
-  // producing a temporal fade around the active line.
-  for (let i = 1; i < history.length; i++) {
-    const points = history[i];
-
-    const alpha = map(i, 1, MAX_HISTORY, HISTORY_NEAR_ALPHA, HISTORY_FAR_ALPHA);
-
-    const offset = i * HISTORY_SPACING;
-
-    drawHistoryLine(points, -offset, alpha);
-
-    drawHistoryLine(points, offset, alpha);
-  }
-}
-
-function drawHistoryLine(points, yOffset, alpha) {
   if (points.length < 2) {
     return;
   }
 
   const smooth = smoothPoints(points);
 
-  push();
+  signalLayer.push();
 
-  noFill();
+  signalLayer.noFill();
 
-  stroke(60, 140, 180, alpha);
+  // -------------------------------------------------------
+  // CURRENT SIGNAL VISUAL STYLE
+  // -------------------------------------------------------
+  //
+  // Future changes to color, line weight, or other visual
+  // properties should happen here.
+  //
+  // Because snapshots are captured from signalLayer, these
+  // changes automatically become part of the temporal effect.
 
-  strokeWeight(1.2);
+  signalLayer.stroke(0, 255, 255);
 
-  beginShape();
+  signalLayer.strokeWeight(3);
+
+  signalLayer.beginShape();
 
   for (const point of smooth) {
-    vertex(point.x, point.y + yOffset);
+    signalLayer.vertex(point.x, point.y);
   }
 
-  endShape();
+  signalLayer.endShape();
+
+  signalLayer.pop();
+}
+
+// =========================================================
+// TEMPORAL SNAPSHOT SYSTEM
+// =========================================================
+//
+// This replaces the earlier generation-history system.
+//
+// A snapshot is NOT an L-system generation.
+//
+// It is a rendered visual state of the live signal at a
+// particular moment in time.
+//
+// Each snapshot:
+//
+//   - starts at the center,
+//   - moves upward and downward simultaneously,
+//   - fades continuously,
+//   - disappears when fully transparent.
+//
+// The system therefore behaves more like a moving temporal
+// echo / afterimage than a symbolic history visualization.
+//
+// =========================================================
+
+// ---------------------------------------------------------
+// Snapshot capture
+// ---------------------------------------------------------
+
+function updateSnapshotCapture() {
+  // Do not continuously generate identical flat snapshots
+  // when audio is stopped.
+  //
+  // Existing snapshots are still allowed to drift and fade.
+
+  if (!song || !song.isPlaying()) {
+    return;
+  }
+
+  if (millis() - lastSnapshotTime < SNAPSHOT_INTERVAL) {
+    return;
+  }
+
+  captureSignalSnapshot();
+
+  lastSnapshotTime = millis();
+}
+
+function captureSignalSnapshot() {
+  // signalLayer.get() captures the already-rendered line.
+  //
+  // It does not need to know anything about symbols,
+  // generations, smoothing, colors, or line thickness.
+
+  const snapshotImage = signalLayer.get();
+
+  temporalSnapshots.push({
+    image: snapshotImage,
+
+    offset: 0,
+
+    alpha: SNAPSHOT_START_ALPHA,
+  });
+
+  // Prevent unlimited memory growth.
+  if (temporalSnapshots.length > MAX_SNAPSHOTS) {
+    temporalSnapshots.shift();
+  }
+}
+
+// ---------------------------------------------------------
+// Snapshot animation
+// ---------------------------------------------------------
+
+function updateTemporalSnapshots() {
+  // Convert milliseconds to seconds so temporal motion is
+  // approximately independent of frame rate.
+
+  const seconds = deltaTime / 1000;
+
+  for (const snapshot of temporalSnapshots) {
+    snapshot.offset += SNAPSHOT_SPEED * seconds;
+
+    snapshot.alpha -= SNAPSHOT_FADE_RATE * seconds;
+  }
+
+  // Remove snapshots after they become invisible.
+  temporalSnapshots = temporalSnapshots.filter(
+    (snapshot) => snapshot.alpha > 0,
+  );
+}
+
+// ---------------------------------------------------------
+// Snapshot rendering
+// ---------------------------------------------------------
+
+function drawTemporalSnapshots() {
+  push();
+
+  for (const snapshot of temporalSnapshots) {
+    const alpha = constrain(snapshot.alpha, 0, 255);
+
+    tint(255, alpha);
+
+    // Upper temporal echo
+    image(snapshot.image, 0, -snapshot.offset);
+
+    // Lower temporal echo
+    image(snapshot.image, 0, snapshot.offset);
+  }
+
+  noTint();
 
   pop();
 }
 
 // =========================================================
-// SIGNAL DRAWING
+// FIXED BASELINE
+// =========================================================
+//
+// The baseline is intentionally drawn on the main canvas
+// rather than signalLayer.
+//
+// Therefore it does not become part of temporal snapshots.
+//
 // =========================================================
 
 function drawBaseline() {
@@ -873,41 +1175,15 @@ function drawBaseline() {
   pop();
 }
 
-function drawSignalLine(points) {
-  if (points.length < 2) {
-    return;
-  }
-
-  const smooth = smoothPoints(points);
-
-  push();
-
-  noFill();
-
-  stroke(0, 255, 255);
-
-  strokeWeight(3);
-
-  beginShape();
-
-  for (const point of smooth) {
-    vertex(point.x, point.y);
-  }
-
-  endShape();
-
-  pop();
-}
-
 // =========================================================
 // DEBUG HUD
 // =========================================================
 //
-// The HUD intentionally exposes both the generative state
-// and the audio analysis while the system is being developed.
+// The HUD exposes the current symbolic and audio states while
+// the project is being developed.
 //
-// It can later be hidden or converted into an optional
-// interface without changing the underlying system.
+// Because it is drawn directly to the main canvas after the
+// temporal effect, it never appears in snapshots.
 //
 // =========================================================
 
@@ -916,6 +1192,7 @@ function drawHUD() {
 
   fill(255);
   noStroke();
+
   textSize(16);
 
   text("Generation: " + generationCount, 20, 30);
@@ -924,7 +1201,9 @@ function drawHUD() {
 
   text(currentString, 20, 80);
 
-  text("Audio: " + (song.isPlaying() ? "PLAYING" : "PAUSED"), 20, 120);
+  const audioPlaying = song && song.isPlaying();
+
+  text("Audio: " + (audioPlaying ? "PLAYING" : "PAUSED"), 20, 120);
 
   text("Amplitude: " + nf(audioLevel, 1, 3), 20, 145);
 
@@ -958,6 +1237,7 @@ function drawAudioMeters() {
   const gap = 20;
 
   push();
+
   noStroke();
 
   // Six meter backgrounds:
@@ -968,6 +1248,7 @@ function drawAudioMeters() {
   // 3 = high
   // 4 = spectral centroid
   // 5 = spectral flux
+
   fill(40);
 
   for (let i = 0; i < 6; i++) {
@@ -976,8 +1257,9 @@ function drawAudioMeters() {
 
   fill(255);
 
-  // Amplitude is currently amplified only for visualization.
-  // Its raw value remains unchanged in the audio analysis.
+  // Amplitude is multiplied only for HUD visualization.
+  // The raw measurement itself remains unchanged.
+
   rect(x, y, barWidth * constrain(audioLevel * 4, 0, 1), barHeight);
 
   rect(x, y + gap, barWidth * lowControl, barHeight);
@@ -994,27 +1276,50 @@ function drawAudioMeters() {
 }
 
 // =========================================================
+// TEMPORAL RESET
+// =========================================================
+
+function resetTemporalSnapshots() {
+  temporalSnapshots = [];
+
+  lastSnapshotTime = millis();
+
+  if (signalLayer) {
+    signalLayer.clear();
+  }
+}
+
+// =========================================================
 // KEYBOARD CONTROLS
 // =========================================================
 //
-// SPACE = pause/resume L-system evolution
+// SPACE = pause/resume L-system generations
 // P     = play/pause audio
-// R     = reset the L-system to its initial string
+// R     = reset L-system + temporal visualization
 //
-// Keeping audio playback and generative evolution separate
-// is useful during development because each subsystem can
-// be inspected independently.
+// Audio playback and L-system evolution remain separate
+// controls so the subsystems can still be inspected during
+// development.
 //
 // =========================================================
 
 async function keyPressed() {
-  // Pause/resume L-system generations.
+  // -------------------------------------------------------
+  // SPACE
+  // Pause/resume symbolic evolution.
+  // -------------------------------------------------------
+
   if (key === " ") {
     isPaused = !isPaused;
+
     return false;
   }
 
-  // Play/pause the MP3.
+  // -------------------------------------------------------
+  // P
+  // Play/pause MP3.
+  // -------------------------------------------------------
+
   if (key === "p" || key === "P") {
     if (!song) {
       return false;
@@ -1024,14 +1329,24 @@ async function keyPressed() {
       song.pause();
     } else {
       await userStartAudio();
+
       song.play();
+
+      // Avoid immediately capturing a snapshot whose timer
+      // has been accumulating during the paused period.
+      lastSnapshotTime = millis();
     }
 
     return false;
   }
 
-  // Reset only the generative system.
-  // Audio playback is deliberately left untouched.
+  // -------------------------------------------------------
+  // R
+  // Reset the generative visual state.
+  //
+  // Audio playback itself is intentionally not restarted.
+  // -------------------------------------------------------
+
   if (key === "r" || key === "R") {
     initializeString();
 
@@ -1041,9 +1356,9 @@ async function keyPressed() {
 
     targetPoints = copyPoints(initialPoints);
 
-    saveHistory(initialPoints);
-
     lastGenerationTime = millis();
+
+    resetTemporalSnapshots();
 
     return false;
   }
