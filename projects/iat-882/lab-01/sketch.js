@@ -28,10 +28,30 @@ let song;
 let fft;
 let amplitude;
 
+let spectralCentroid = 0;
+let spectralFlux = 0;
+
+let fluxControl = 0;
+let fluxPeak = 0.0001;
+let fluxPeakDecay = 0.995;
+
+let previousSpectrum = [];
+
 let audioLevel = 0;
-let bassEnergy = 0;
-let midEnergy = 0;
-let trebleEnergy = 0;
+
+let lowEnergy = 0;
+let middleEnergy = 0;
+let highEnergy = 0;
+
+let lowControl = 0;
+let middleControl = 0;
+let highControl = 0;
+
+let lowPeak = 0.001;
+let middlePeak = 0.001;
+let highPeak = 0.001;
+
+let peakDecay = 0.995;
 
 // -------------------------
 // STOCHASTIC RULES
@@ -111,21 +131,72 @@ async function setup() {
 function analyzeAudio() {
   if (!song || !song.isPlaying()) {
     audioLevel = 0;
-    bassEnergy = 0;
-    midEnergy = 0;
-    trebleEnergy = 0;
+
+    lowEnergy = 0;
+    middleEnergy = 0;
+    highEnergy = 0;
+
+    lowControl = 0;
+    middleControl = 0;
+    highControl = 0;
+
+    spectralCentroid = 0;
+    spectralFlux = 0;
+
+    fluxControl = 0;
+
+    previousSpectrum = [];
+
     return;
   }
 
   let spectrum = fft.analyze();
 
+  spectralCentroid = calculateSpectralCentroid(spectrum);
+
+  spectralFlux = calculateSpectralFlux(spectrum, previousSpectrum);
+
+  previousSpectrum = [...spectrum];
+
   audioLevel = amplitude.getLevel();
 
-  bassEnergy = getBandEnergy(spectrum, 20, 250);
+  lowEnergy = getBandEnergy(spectrum, 50, 250);
 
-  midEnergy = getBandEnergy(spectrum, 250, 4000);
+  middleEnergy = getBandEnergy(spectrum, 250, 1200);
 
-  trebleEnergy = getBandEnergy(spectrum, 4000, 12000);
+  highEnergy = getBandEnergy(spectrum, 1200, 4000);
+
+  fluxPeak *= fluxPeakDecay;
+
+  fluxPeak = max(fluxPeak, spectralFlux);
+
+  let targetFlux = constrain(spectralFlux / fluxPeak, 0, 1);
+
+  fluxControl = lerp(fluxControl, targetFlux, 0.25);
+
+  // Slowly forget old peaks
+  lowPeak *= peakDecay;
+  middlePeak *= peakDecay;
+  highPeak *= peakDecay;
+
+  // Remember new peaks
+  lowPeak = max(lowPeak, lowEnergy);
+  middlePeak = max(middlePeak, middleEnergy);
+  highPeak = max(highPeak, highEnergy);
+
+  // Normalize to 0–1
+  let targetLow = constrain(lowEnergy / lowPeak, 0, 1);
+
+  let targetMiddle = constrain(middleEnergy / middlePeak, 0, 1);
+
+  let targetHigh = constrain(highEnergy / highPeak, 0, 1);
+
+  // Smooth the visible/control values
+  lowControl = lerp(lowControl, targetLow, 0.15);
+
+  middleControl = lerp(middleControl, targetMiddle, 0.15);
+
+  highControl = lerp(highControl, targetHigh, 0.15);
 }
 
 // -------------------------
@@ -143,11 +214,13 @@ function getBandEnergy(spectrum, minFrequency, maxFrequency) {
 
   endIndex = constrain(endIndex, 0, spectrum.length - 1);
 
-  let total = 0;
+  let sumSquares = 0;
   let count = 0;
 
   for (let i = startIndex; i <= endIndex; i++) {
-    total += spectrum[i];
+    let value = spectrum[i];
+
+    sumSquares += value * value;
     count++;
   }
 
@@ -155,7 +228,57 @@ function getBandEnergy(spectrum, minFrequency, maxFrequency) {
     return 0;
   }
 
-  return total / count;
+  return sqrt(sumSquares / count);
+}
+
+function calculateSpectralCentroid(spectrum) {
+  let audioContext = getAudioContext();
+  let nyquist = audioContext.sampleRate / 2;
+
+  let weightedSum = 0;
+  let magnitudeSum = 0;
+
+  for (let i = 0; i < spectrum.length; i++) {
+    let frequency = map(i, 0, spectrum.length - 1, 0, nyquist);
+
+    let magnitude = spectrum[i];
+
+    weightedSum += frequency * magnitude;
+    magnitudeSum += magnitude;
+  }
+
+  if (magnitudeSum === 0) {
+    return 0;
+  }
+
+  let centroidHz = weightedSum / magnitudeSum;
+
+  return constrain(centroidHz / nyquist, 0, 1);
+}
+
+function calculateSpectralFlux(spectrum, previous) {
+  if (previous.length !== spectrum.length) {
+    return 0;
+  }
+
+  let sumSquares = 0;
+  let count = 0;
+
+  for (let i = 0; i < spectrum.length; i++) {
+    let difference = spectrum[i] - previous[i];
+
+    // Only positive spectral changes
+    if (difference > 0) {
+      sumSquares += difference * difference;
+      count++;
+    }
+  }
+
+  if (count === 0) {
+    return 0;
+  }
+
+  return sqrt(sumSquares / count);
 }
 
 // -------------------------
@@ -519,11 +642,15 @@ function drawHUD() {
 
   text("Amplitude: " + nf(audioLevel, 1, 3), 20, 145);
 
-  text("Bass: " + nf(bassEnergy, 1, 3), 20, 170);
+  text("Low: " + nf(lowControl, 1, 2), 20, 170);
+  text("Middle: " + nf(middleControl, 1, 2), 20, 195);
+  text("High: " + nf(highControl, 1, 2), 20, 220);
 
-  text("Mid: " + nf(midEnergy, 1, 3), 20, 195);
+  text("Centroid: " + nf(spectralCentroid, 1, 3), 20, 245);
 
-  text("Treble: " + nf(trebleEnergy, 1, 3), 20, 220);
+  text("Flux raw: " + nf(spectralFlux, 1, 6), 20, 270);
+
+  text("Flux control: " + nf(fluxControl, 1, 2), 20, 295);
 
   pop();
 }
@@ -534,11 +661,11 @@ function drawHUD() {
 
 function drawAudioMeters() {
   let x = 20;
-  let y = 245;
+  let y = 350;
 
-  let barWidth = 160;
+  let barWidth = 190;
   let barHeight = 8;
-  let gap = 18;
+  let gap = 20;
 
   push();
 
@@ -547,7 +674,7 @@ function drawAudioMeters() {
   // background bars
   fill(40);
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     rect(x, y + i * gap, barWidth, barHeight);
   }
 
@@ -555,17 +682,20 @@ function drawAudioMeters() {
   fill(255);
   rect(x, y, barWidth * constrain(audioLevel * 4, 0, 1), barHeight);
 
-  // bass
-  fill(255);
-  rect(x, y + gap, barWidth * bassEnergy, barHeight);
+  // low
+  rect(x, y + gap, barWidth * lowControl, barHeight);
 
-  // mid
-  fill(255);
-  rect(x, y + gap * 2, barWidth * midEnergy, barHeight);
+  // middle
+  rect(x, y + gap * 2, barWidth * middleControl, barHeight);
 
-  // treble
-  fill(255);
-  rect(x, y + gap * 3, barWidth * trebleEnergy, barHeight);
+  // high
+  rect(x, y + gap * 3, barWidth * highControl, barHeight);
+
+  // centroid
+  rect(x, y + gap * 4, barWidth * spectralCentroid, barHeight);
+
+  // flux
+  rect(x, y + gap * 5, barWidth * fluxControl, barHeight);
 
   pop();
 }
