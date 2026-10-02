@@ -15,7 +15,9 @@ async function setup() {
 }
 
 function draw() {
-  background(backgroundImage);
+  tint(200);
+  image(backgroundImage, 0, 0, width, height);
+  noTint();
 
   let speed = 10;
   let slowFrame = floor(frameCount / speed);
@@ -24,5 +26,11 @@ function draw() {
     if (i === index) {
       image(frames[i], 180, 115, 135, 210);
     }
+  }
+}
+
+function keyPressed() {
+  if (key === "s" || key === "S") {
+    saveGif("character-animation", 2.67);
   }
 }
