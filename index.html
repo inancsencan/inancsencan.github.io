@@ -4,55 +4,140 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- EDIT ME: this is what shows in the browser tab -->
-    <title>Inanc's website</title>
+    <title>Inanc Sencan</title>
 
     <link rel="stylesheet" href="style.css" />
+    <script src="script.js" defer></script>
   </head>
-  <body>
-    <header>
-      <!-- EDIT ME: your name -->
-      <a class="site-name" href="index.html">Inanc</a>
-      <nav>
-        <a href="index.html">Home</a>
+
+  <body class="home-page">
+    <header class="home-topbar">
+      <a class="home-brand" href="index.html"> INANC SENCAN </a>
+
+      <span id="personaName" class="persona-name"> Architecture </span>
+
+      <nav class="home-nav">
+        <a href="#work">Work</a>
         <a href="projects/index.html">Projects</a>
+        <a href="mailto:isa86@sfu.ca">Contact</a>
       </nav>
     </header>
 
-    <main>
-      <!-- EDIT ME: everything between here and the end of <main> -->
-      <h1>Hi, I'm Inanc.</h1>
-      <p class="tagline">
-        M.Sc. student at Simon Fraser University, School of Interactive Arts
-        &amp; Technology.
-      </p>
+    <main class="home-main">
+      <section class="hero">
+        <div id="slides" class="slides">
+          <section class="room architecture" aria-label="Architecture">
+            <img
+              src="assets/rooms/architecture.jpg"
+              alt=""
+              class="room-image"
+            />
 
-      <p>
-        I have worked on a variety of topics in computational design, such as
-        parametric design, digital fabricaction, interactive applications etc.
-        Currently I am working on AI-enhanced AR/VR experiences and their
-        potentials.
-      </p>
+            <div class="room-label">
+              <p>01</p>
+              <h1>Architecture</h1>
+            </div>
+          </section>
 
-      <h2>What's here</h2>
-      <p>
-        Everything I build for my classes, my research, and my personal projects
-        lives under
-        <a href="projects/index.html">Projects</a>.
-      </p>
+          <section class="room computation" aria-label="Computational Design">
+            <img
+              src="assets/rooms/computational-design.jpg"
+              alt=""
+              class="room-image"
+            />
 
-      <h2>Elsewhere</h2>
-      <p>
-        <!-- EDIT ME: replace "your-username" with your GitHub username,
-           or delete any line you don't want. -->
-        <a href="https://github.com/inancsencan">GitHub</a> &middot;
-        <a href="mailto:isa86@sfu.ca">Email</a>
-      </p>
+            <div class="room-label">
+              <p>02</p>
+              <h1>Computational Design</h1>
+            </div>
+          </section>
+
+          <section class="room interaction" aria-label="Interactive Arts">
+            <img
+              src="assets/rooms/interactive-arts.jpg"
+              alt=""
+              class="room-image"
+            />
+
+            <div class="room-label">
+              <p>03</p>
+              <h1>Interactive Arts</h1>
+            </div>
+          </section>
+        </div>
+
+        <button
+          id="prevBtn"
+          class="room-arrow room-arrow-left"
+          aria-label="Previous room"
+        >
+          ←
+        </button>
+
+        <button
+          id="nextBtn"
+          class="room-arrow room-arrow-right"
+          aria-label="Next room"
+        >
+          →
+        </button>
+
+        <div class="room-indicator">
+          <span id="roomCounter">01 / 03</span>
+
+          <div class="room-dots">
+            <button
+              class="dot active"
+              data-room="0"
+              aria-label="Architecture"
+            ></button>
+
+            <button
+              class="dot"
+              data-room="1"
+              aria-label="Computational Design"
+            ></button>
+
+            <button
+              class="dot"
+              data-room="2"
+              aria-label="Interactive Arts"
+            ></button>
+          </div>
+        </div>
+      </section>
+
+      <section id="work" class="home-work">
+        <div class="home-work-inner">
+          <p class="section-label">Selected work</p>
+
+          <article class="home-project">
+            <div class="project-meta">Architecture / Computational Design</div>
+
+            <div>
+              <h2>Project title</h2>
+              <p>A short description of the project will go here.</p>
+            </div>
+
+            <div class="project-image">Image</div>
+          </article>
+
+          <article class="home-project">
+            <div class="project-meta">Interactive Arts</div>
+
+            <div>
+              <h2>Project title</h2>
+              <p>A short description of the project will go here.</p>
+            </div>
+
+            <div class="project-image">Image</div>
+          </article>
+
+          <p class="all-projects-link">
+            <a href="projects/index.html"> View all projects → </a>
+          </p>
+        </div>
+      </section>
     </main>
-
-    <footer>
-      <!-- EDIT ME -->
-      <p>Inanc &middot; Built for IAT 806.</p>
-    </footer>
   </body>
 </html>

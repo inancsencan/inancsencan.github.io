@@ -2,10 +2,13 @@ console.log("nothing important here");
 
 let frames = [];
 let backgroundImage;
+let snd;
 
 async function setup() {
   createCanvas(500, 400);
   backgroundImage = await loadImage("background.png");
+  snd = await loadSound("sounds/sound0.mp3");
+  //snd.play();
 
   for (let i = 1; i <= 16; i++) {
     let number = String(i).padStart(2, "0");
