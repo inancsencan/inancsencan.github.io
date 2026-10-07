@@ -4,12 +4,14 @@ let snd;
 let started = false;
 let paused = false;
 
-let timeFrame = 0;
-
 // intro animation timing
-let danceStart = 1000;
+let danceStart = 5;
 
-// List of characters
+// Timeline sistemi
+let playStartedAt = 0;
+let accumulatedTime = 0;
+
+// One Piece karakterleri
 let characters = ["luffy", "nami", "zoro", "sanji", "robin"];
 
 let currentCharacter = 0;
@@ -24,33 +26,45 @@ async function setup() {
 function draw() {
   background(0);
 
-  // Draw start screen
+  // Henüz başlamadıysa başlangıç ekranı
   if (!started) {
     drawStartScreen();
     return;
   }
 
-  if (!paused) {
-    // Intro / dance switch
-    if (timeFrame < danceStart) {
-      drawIntro();
-    } else {
-      drawDance();
-    }
+  // Kendi timeline zamanımız
+  let t = getTimelineTime();
+
+  // Intro / dance geçişi
+  if (t < danceStart) {
+    drawIntro(t);
+  } else {
+    drawDance(t);
   }
-  // Draw pause screen
-  else {
+
+  // Pause göstergesi
+  if (paused) {
     drawPauseScreen();
   }
-
-  // Draw frame count
-  fill(120);
-  textAlign(LEFT, TOP);
-  textSize(12);
-  text("Frame Count: " + timeFrame, 10, 10);
 }
 
-// Start screen
+// --------------------------------------------------
+// TIMELINE
+// --------------------------------------------------
+
+function getTimelineTime() {
+  // Pause durumundaysa zaman ilerlemez
+  if (paused) {
+    return accumulatedTime;
+  }
+
+  // Çalıyorsa geçen süreyi hesapla
+  return accumulatedTime + (millis() - playStartedAt) / 1000;
+}
+
+// --------------------------------------------------
+// START SCREEN
+// --------------------------------------------------
 
 function drawStartScreen() {
   background(20);
@@ -62,9 +76,11 @@ function drawStartScreen() {
   text("PRESS P TO PLAY", width / 2, height / 2);
 }
 
-// Intro animation
+// --------------------------------------------------
+// INTRO
+// --------------------------------------------------
 
-function drawIntro() {
+function drawIntro(t) {
   tint(180);
   image(backgroundImage, 0, 0, width, height);
   noTint();
@@ -75,12 +91,15 @@ function drawIntro() {
   textSize(28);
   text("INTRO", width / 2, height / 2);
 
-  timeFrame++;
+  textSize(14);
+  text(t.toFixed(1) + " s", width / 2, height / 2 + 40);
 }
 
-// DANCE!
+// --------------------------------------------------
+// DANCE MODE
+// --------------------------------------------------
 
-function drawDance() {
+function drawDance(t) {
   background(255);
 
   let characterName = characters[currentCharacter];
@@ -97,10 +116,13 @@ function drawDance() {
   textSize(16);
   text("LEFT / RIGHT ARROW", width / 2, 250);
 
-  timeFrame++;
+  textSize(14);
+  text(t.toFixed(1) + " s", width / 2, 290);
 }
 
-// Pause screen
+// --------------------------------------------------
+// PAUSE SCREEN
+// --------------------------------------------------
 
 function drawPauseScreen() {
   fill(0, 160);
@@ -113,25 +135,40 @@ function drawPauseScreen() {
   text("PAUSED", width / 2, height / 2);
 }
 
-// Key actions
+// --------------------------------------------------
+// KEYBOARD
+// --------------------------------------------------
+
 function keyPressed() {
   // P = PLAY / PAUSE
   if (key === "p" || key === "P") {
     if (!started) {
       started = true;
       paused = false;
+
+      accumulatedTime = 0;
+      playStartedAt = millis();
+
       snd.play();
     } else if (!paused) {
+      accumulatedTime += (millis() - playStartedAt) / 1000;
+
       paused = true;
       snd.pause();
     } else {
       paused = false;
+      playStartedAt = millis();
+
       snd.play();
     }
+
     return false;
   }
 
-  if (started && timeFrame >= danceStart) {
+  // Sadece dance mode'da karakter değiştir
+  let t = getTimelineTime();
+
+  if (started && t >= danceStart) {
     // RIGHT ARROW
     if (key === "ArrowRight") {
       currentCharacter++;
