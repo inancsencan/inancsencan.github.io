@@ -27,6 +27,7 @@ async function setup() {
   backgroundImage = await loadImage("background.png");
   logoImage = await loadImage("logo.png");
   snd = await loadSound("sounds/sound0.mp3");
+  snd.loop(true);
 
   //load character frames
   for (let character of characters) {
