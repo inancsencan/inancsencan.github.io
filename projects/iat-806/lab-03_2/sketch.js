@@ -57,10 +57,10 @@ function draw() {
   }
 
   // Draw frame count
-  fill(120);
+  /* fill(120);
   textAlign(LEFT, TOP);
   textSize(12);
-  text("Frame Count: " + timeFrame, 10, 10);
+  text("Frame Count: " + timeFrame, 10, 10); */
 }
 
 // Load character frames
@@ -92,16 +92,38 @@ function applyRandomTint(minimumChannel, holdFrames) {
   tint(...currentBackgroundTint);
 }
 
+// Draw logo
+function drawLogo() {
+  let logoWidth = 700;
+  let logoHeight = (logoImage.height * logoWidth) / logoImage.width;
+  image(
+    logoImage,
+    (width - logoWidth) / 2,
+    (height - logoHeight) / 2,
+    logoWidth,
+    logoHeight,
+  );
+}
 // Start screen
 
 function drawStartScreen() {
-  //background(20);
+  image(backgroundImage, 0, 0, width, height);
+  drawLogo();
 
-  fill(255);
+  push();
+  rectMode(CENTER);
+  noStroke();
+  fill(0, 160);
+  rect(width / 2, 700, 370, 62, 8);
+
+  stroke(20, 220);
+  strokeWeight(6);
+  fill(255, 225, 135);
   textAlign(CENTER, CENTER);
-
-  textSize(24);
-  text("PRESS P TO PLAY", width / 2, height / 2);
+  textStyle(BOLD);
+  textSize(28);
+  text("PRESS P TO PLAY", width / 2, 700);
+  pop();
 }
 
 // Intro animation
@@ -113,15 +135,29 @@ function drawIntro() {
   noTint();
 
   // Draw logo
-  let logoWidth = 700;
-  let logoHeight = (logoImage.height * logoWidth) / logoImage.width;
-  image(
-    logoImage,
-    (width - logoWidth) / 2,
-    (height - logoHeight) / 2,
-    logoWidth,
-    logoHeight,
-  );
+  drawLogo();
+
+  // Draw progress bar
+  let barWidth = 500;
+  let barHeight = 14;
+  let barX = (width - barWidth) / 2;
+  let barY = height - 60;
+  let progress = constrain((timeFrame + 1) / danceStart, 0, 1);
+
+  noStroke();
+  fill(0, 150);
+  rect(barX, barY, barWidth, barHeight);
+  fill(255);
+  rect(barX, barY, barWidth * progress, barHeight);
+
+  push();
+  stroke(0, 180);
+  strokeWeight(4);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text("Use arrow keys to change character", width / 2, height - 22);
+  pop();
 
   timeFrame++;
 }
@@ -136,13 +172,23 @@ function drawDance() {
   // Pick animation frame
   let animationFrame = floor(timeFrame / animationSpeed) % frames.length;
 
+  // Bounce
+  let bounce = abs(sin(timeFrame * 0.15)) * 30;
+
+  push();
+  translate(0, -bounce);
+
   // Draw background with a stronger tint effect
   applyRandomTint(0, 15);
-  image(backgroundImage, 0, 0, width, height);
+  imageMode(CENTER);
+  image(backgroundImage, width / 2, height / 2, width * 1.1, height * 1.1);
+  imageMode(CORNER);
   noTint();
 
   // Draw character animation
   image(frames[animationFrame], 350, 115);
+
+  pop();
 
   // Debug for dance mode
   /* fill(255);
@@ -160,11 +206,16 @@ function drawDance() {
 // Pause screen
 
 function drawPauseScreen() {
+  push();
+  stroke(20, 220);
+  strokeWeight(8);
   fill(255);
   textAlign(CENTER, CENTER);
-
-  textSize(28);
-  text("PAUSED", width / 2, (3 * height) / 4);
+  textStyle(BOLD);
+  textSize(48);
+  fill(255, 225, 135);
+  text("PAUSED", width / 2, 700);
+  pop();
 }
 
 // Key actions
