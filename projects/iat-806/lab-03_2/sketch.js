@@ -7,7 +7,8 @@ let paused = false;
 
 let timeFrame = 0;
 let animationSpeed = 11;
-let tintMultiplier = 0.015;
+let currentTintStep = -1;
+let currentBackgroundTint = [255, 255, 255];
 
 // intro animation timing
 let danceStart = 1000;
@@ -76,6 +77,21 @@ async function loadCharacterFrames(characterName, frameTotal) {
   return loadedFrames;
 }
 
+function applyRandomTint(minimumChannel, holdFrames) {
+  let tintStep = floor(timeFrame / holdFrames);
+
+  if (tintStep !== currentTintStep) {
+    currentBackgroundTint = [
+      random(minimumChannel, 255),
+      random(minimumChannel, 255),
+      random(minimumChannel, 255),
+    ];
+    currentTintStep = tintStep;
+  }
+
+  tint(...currentBackgroundTint);
+}
+
 // Start screen
 
 function drawStartScreen() {
@@ -92,11 +108,7 @@ function drawStartScreen() {
 
 function drawIntro() {
   // Draw background with tint effect
-  let tintTime = timeFrame * tintMultiplier;
-  let tintRed = 160 + noise(tintTime) * 95;
-  let tintGreen = 160 + noise(tintTime + 50) * 95;
-  let tintBlue = 160 + noise(tintTime + 100) * 95;
-  tint(tintRed, tintGreen, tintBlue);
+  applyRandomTint(160, 90);
   image(backgroundImage, 0, 0, width, height);
   noTint();
 
@@ -124,14 +136,16 @@ function drawDance() {
   // Pick animation frame
   let animationFrame = floor(timeFrame / animationSpeed) % frames.length;
 
-  // Draw background
+  // Draw background with a stronger tint effect
+  applyRandomTint(0, 15);
   image(backgroundImage, 0, 0, width, height);
+  noTint();
 
   // Draw character animation
   image(frames[animationFrame], 350, 115);
 
   // Debug for dance mode
-  fill(255);
+  /* fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(24);
@@ -139,7 +153,7 @@ function drawDance() {
 
   textSize(14);
   text("LEFT / RIGHT ARROW", width / 2, 370);
-
+ */
   timeFrame++;
 }
 
