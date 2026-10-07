@@ -5,9 +5,13 @@ let started = false;
 let paused = false;
 
 let timeFrame = 0;
+let animationSpeed = 6;
 
 // intro animation timing
 let danceStart = 1000;
+
+// frames list
+let characterFrames = {};
 
 // List of characters
 let characters = ["luffy", "nami", "zoro", "sanji", "robin"];
@@ -15,10 +19,15 @@ let characters = ["luffy", "nami", "zoro", "sanji", "robin"];
 let currentCharacter = 0;
 
 async function setup() {
-  createCanvas(500, 400);
+  createCanvas(1000, 800);
 
   backgroundImage = await loadImage("background.png");
   snd = await loadSound("sounds/sound0.mp3");
+
+  //load character frames
+  for (let character of characters) {
+    characterFrames[character] = await loadCharacterFrames(character, 8);
+  }
 }
 
 function draw() {
@@ -50,6 +59,20 @@ function draw() {
   text("Frame Count: " + timeFrame, 10, 10);
 }
 
+// Load character frames
+async function loadCharacterFrames(characterName, frameTotal) {
+  let loadedFrames = [];
+
+  for (let i = 1; i <= frameTotal; i++) {
+    let number = String(i).padStart(2, "0");
+    let path = `frames/${characterName}/${number}.png`;
+
+    loadedFrames.push(await loadImage(path));
+  }
+
+  return loadedFrames;
+}
+
 // Start screen
 
 function drawStartScreen() {
@@ -79,23 +102,29 @@ function drawIntro() {
 }
 
 // DANCE!
-
 function drawDance() {
   background(255);
 
   let characterName = characters[currentCharacter];
 
+  // Active character
+  let frames = characterFrames[characterName];
+
+  // Pick animation frame
+  let animationFrame = floor(timeFrame / animationSpeed) % frames.length;
+
+  // Draw character animation
+  image(frames[animationFrame], 180, 115);
+
+  // Debug for dance mode
   fill(0);
   textAlign(CENTER, CENTER);
 
-  textSize(40);
-  text("DANCE MODE", width / 2, 110);
+  textSize(24);
+  text(characterName.toUpperCase(), width / 2, 40);
 
-  textSize(32);
-  text(characterName.toUpperCase(), width / 2, 190);
-
-  textSize(16);
-  text("LEFT / RIGHT ARROW", width / 2, 250);
+  textSize(14);
+  text("LEFT / RIGHT ARROW", width / 2, 370);
 
   timeFrame++;
 }
@@ -106,7 +135,7 @@ function drawPauseScreen() {
   fill(0, 160);
   rect(0, 0, width, height);
 
-  fill(255);
+  fill(255, 100);
   textAlign(CENTER, CENTER);
 
   textSize(28);
