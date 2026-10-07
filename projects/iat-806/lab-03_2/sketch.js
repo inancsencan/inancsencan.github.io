@@ -219,20 +219,29 @@ function drawPauseScreen() {
 }
 
 // Key actions
+function togglePlayback() {
+  if (!started) {
+    started = true;
+    paused = false;
+    snd.play();
+  } else if (!paused) {
+    paused = true;
+    snd.pause();
+  } else {
+    paused = false;
+    snd.play();
+  }
+}
+
+function mousePressed() {
+  togglePlayback();
+  return false;
+}
+
 function keyPressed() {
   // P = PLAY / PAUSE
   if (key === "p" || key === "P") {
-    if (!started) {
-      started = true;
-      paused = false;
-      snd.play();
-    } else if (!paused) {
-      paused = true;
-      snd.pause();
-    } else {
-      paused = false;
-      snd.play();
-    }
+    togglePlayback();
     return false;
   }
 
