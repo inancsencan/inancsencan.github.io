@@ -1,11 +1,13 @@
 let backgroundImage;
+let logoImage;
 let snd;
 
 let started = false;
 let paused = false;
 
 let timeFrame = 0;
-let animationSpeed = 6;
+let animationSpeed = 11;
+let tintMultiplier = 0.015;
 
 // intro animation timing
 let danceStart = 1000;
@@ -22,6 +24,7 @@ async function setup() {
   createCanvas(1000, 800);
 
   backgroundImage = await loadImage("background.png");
+  logoImage = await loadImage("logo.png");
   snd = await loadSound("sounds/sound0.mp3");
 
   //load character frames
@@ -31,7 +34,7 @@ async function setup() {
 }
 
 function draw() {
-  background(0);
+  //background(0);
 
   // Draw start screen
   if (!started) {
@@ -76,7 +79,7 @@ async function loadCharacterFrames(characterName, frameTotal) {
 // Start screen
 
 function drawStartScreen() {
-  background(20);
+  //background(20);
 
   fill(255);
   textAlign(CENTER, CENTER);
@@ -88,23 +91,31 @@ function drawStartScreen() {
 // Intro animation
 
 function drawIntro() {
-  tint(180);
+  // Draw background with tint effect
+  let tintTime = timeFrame * tintMultiplier;
+  let tintRed = 160 + noise(tintTime) * 95;
+  let tintGreen = 160 + noise(tintTime + 50) * 95;
+  let tintBlue = 160 + noise(tintTime + 100) * 95;
+  tint(tintRed, tintGreen, tintBlue);
   image(backgroundImage, 0, 0, width, height);
   noTint();
 
-  fill(255);
-  textAlign(CENTER, CENTER);
-
-  textSize(28);
-  text("INTRO", width / 2, height / 2);
+  // Draw logo
+  let logoWidth = 700;
+  let logoHeight = (logoImage.height * logoWidth) / logoImage.width;
+  image(
+    logoImage,
+    (width - logoWidth) / 2,
+    (height - logoHeight) / 2,
+    logoWidth,
+    logoHeight,
+  );
 
   timeFrame++;
 }
 
 // DANCE!
 function drawDance() {
-  background(255);
-
   let characterName = characters[currentCharacter];
 
   // Active character
@@ -113,11 +124,14 @@ function drawDance() {
   // Pick animation frame
   let animationFrame = floor(timeFrame / animationSpeed) % frames.length;
 
+  // Draw background
+  image(backgroundImage, 0, 0, width, height);
+
   // Draw character animation
-  image(frames[animationFrame], 180, 115);
+  image(frames[animationFrame], 350, 115);
 
   // Debug for dance mode
-  fill(0);
+  fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(24);
@@ -132,14 +146,11 @@ function drawDance() {
 // Pause screen
 
 function drawPauseScreen() {
-  fill(0, 160);
-  rect(0, 0, width, height);
-
-  fill(255, 100);
+  fill(255);
   textAlign(CENTER, CENTER);
 
   textSize(28);
-  text("PAUSED", width / 2, height / 2);
+  text("PAUSED", width / 2, (3 * height) / 4);
 }
 
 // Key actions
