@@ -122,7 +122,7 @@ function drawStartScreen() {
   textAlign(CENTER, CENTER);
   textStyle(BOLD);
   textSize(28);
-  text("PRESS P TO PLAY", width / 2, 700);
+  text("TAP OR PRESS P TO PLAY", width / 2, 700);
   pop();
 }
 
@@ -233,15 +233,34 @@ function togglePlayback() {
   }
 }
 
-function mousePressed() {
+async function togglePlaybackFromInput() {
+  if (!started || paused) {
+    await userStartAudio();
+  }
+
   togglePlayback();
+}
+
+function handlePlaybackInput() {
+  togglePlaybackFromInput().catch((error) => {
+    console.error("Unable to start audio playback:", error);
+  });
+
   return false;
+}
+
+function mousePressed() {
+  return handlePlaybackInput();
+}
+
+function touchStarted() {
+  return handlePlaybackInput();
 }
 
 function keyPressed() {
   // P = PLAY / PAUSE
   if (key === "p" || key === "P") {
-    togglePlayback();
+    handlePlaybackInput();
     return false;
   }
 
