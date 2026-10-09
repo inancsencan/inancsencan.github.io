@@ -6,6 +6,13 @@ let fakeCanvasSize;
 
 let contentWidth;
 let contentX;
+//define ball
+let ballPos;
+let ballSize = 30;
+let r = ballSize / 2;
+
+//stages
+let stage = 1;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -13,15 +20,50 @@ function setup() {
   // draw fake canvas
   fakeCanvas();
 
-  // resize canvas if page is too small for the fake canvas to fit the page
-  const pageHeight = fakeCanvasY + fakeCanvasSize + 300;
-  resizeCanvas(windowWidth, max(windowHeight, pageHeight), true);
+  // set ball as vector at mouse
+  ballPos = createVector(mouseX, mouseY);
 }
 
 function draw() {
   background("#1f1e1e");
 
   drawFakePage();
+
+  switch (stage) {
+    case 1:
+      stage1Behaviour();
+      break;
+  }
+
+  drawBall();
+}
+// ----
+// Ball functions
+// ----
+
+// Ball states
+function stage1Behaviour() {
+  let r = ballSize / 2;
+
+  ballPos.x = constrain(
+    mouseX,
+    fakeCanvasX + r,
+    fakeCanvasX + fakeCanvasSize - r,
+  );
+
+  ballPos.y = constrain(
+    mouseY,
+    fakeCanvasY + r,
+    fakeCanvasY + fakeCanvasSize - r,
+  );
+  fill(255);
+}
+
+// Draw ball
+function drawBall() {
+  fill(255);
+  noStroke();
+  circle(ballPos.x, ballPos.y, ballSize);
 }
 
 // function to draw the fake canvas and resize the window accordingly
@@ -115,4 +157,8 @@ function drawFakePage() {
 // update canvas when window is resized
 function windowResized() {
   fakeCanvas();
+
+  // resize canvas if page is too small for the fake canvas to fit the page
+  const pageHeight = fakeCanvasY + fakeCanvasSize + 300;
+  resizeCanvas(windowWidth, max(windowHeight, pageHeight), true);
 }
