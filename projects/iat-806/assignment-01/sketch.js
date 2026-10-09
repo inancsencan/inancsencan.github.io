@@ -4,9 +4,18 @@ let fakeCanvasX;
 let fakeCanvasY;
 let fakeCanvasSize;
 
+let contentWidth;
+let contentX;
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  updateCanvasSize();
+
+  // draw fake canvas
+  fakeCanvas();
+
+  // resize canvas if page is too small for the fake canvas to fit the page
+  const pageHeight = fakeCanvasY + fakeCanvasSize + 300;
+  resizeCanvas(windowWidth, max(windowHeight, pageHeight), true);
 }
 
 function draw() {
@@ -15,20 +24,22 @@ function draw() {
   drawFakePage();
 }
 
-function updateCanvasSize() {
-  const contentWidth = min(704, windowWidth - 40);
-  fakeCanvasX = (windowWidth - contentWidth) / 2;
+// function to draw the fake canvas and resize the window accordingly
+function fakeCanvas() {
+  // check whichever is minimum (window or fake frame)
+  contentWidth = min(704, windowWidth - 40);
+
+  // center the page content
+  contentX = (windowWidth - contentWidth) / 2;
+
+  // resize the fake canvas accordingly
+  fakeCanvasX = contentX;
   fakeCanvasSize = min(800, contentWidth);
   fakeCanvasY = 276;
-
-  const pageHeight = fakeCanvasY + fakeCanvasSize + 300;
-  resizeCanvas(windowWidth, max(windowHeight, pageHeight), true);
 }
 
+// make a convincing fake page
 function drawFakePage() {
-  const contentWidth = min(704, width - 40);
-  const contentX = (width - contentWidth) / 2;
-
   // Header
   noStroke();
   fill("#f8f6f6");
@@ -43,6 +54,7 @@ function drawFakePage() {
   textAlign(RIGHT, BASELINE);
   text("Home", contentX + contentWidth - 86, 56);
   text("Projects", contentX + contentWidth, 56);
+
   stroke("#e19f2c");
   strokeWeight(1);
   line(contentX, 80, contentX + contentWidth, 80);
@@ -57,12 +69,15 @@ function drawFakePage() {
   fill("#f8f6f6");
   const title = "Lab 02 — Interactive Drawing";
   let titleSize = 40;
+
+  textStyle(BOLD);
   textSize(titleSize);
+
   while (textWidth(title) > contentWidth && titleSize > 24) {
     titleSize -= 1;
     textSize(titleSize);
   }
-  textStyle(BOLD);
+
   text(title, contentX, 174);
 
   fill("#8c8c8e");
@@ -84,6 +99,7 @@ function drawFakePage() {
   textSize(14);
   textStyle(NORMAL);
   textLeading(17.5);
+
   text(
     "I made the circle go along the X-axis and bounce back when it hits the edge of the canvas. The circle's Y position is controlled by the mouse's Y position. I also added a feature where the circle changes color every second to a random color. Circle radius increases according to its distance to the edges of the canvas, in a square ratio. Additionally, when mouse is pressed, the travel direction of the circle is reversed. I also added a vertical line to visualize the movement. Background refreshes gradually to create a fading effect.",
     contentX,
@@ -96,6 +112,7 @@ function drawFakePage() {
   text("← Back to IAT 806", contentX, fakeCanvasY + fakeCanvasSize + 225);
 }
 
+// update canvas when window is resized
 function windowResized() {
-  updateCanvasSize();
+  fakeCanvas();
 }
