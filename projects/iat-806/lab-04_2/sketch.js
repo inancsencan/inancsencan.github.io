@@ -46,6 +46,10 @@ function draw() {
   colWidth = width / numCols;
   rowHeight = height / numRows;
   let maxDistance = dist(0, 0, width, height);
+  let hoveredCol =
+    mouseX >= 0 && mouseX < width ? Math.floor(mouseX / colWidth) : -1;
+  let hoveredRow =
+    mouseY >= 0 && mouseY < height ? Math.floor(mouseY / rowHeight) : -1;
 
   for (let i = 0; i < numCols; i++) {
     for (let j = 0; j < numRows; j++) {
@@ -63,39 +67,49 @@ function draw() {
         lastAnimationSteps[i][j] = frameIndex;
       }
 
+      if (i === hoveredCol && j === hoveredRow) {
+        continue;
+      }
+
+      push();
+      translate(xPosition, yPosition);
       fill(colors[i][j]);
-      ellipse(
-        i * colWidth + colWidth / 2,
-        j * rowHeight + rowHeight / 2,
-        colWidth,
-        rowHeight,
-      );
-      animate(
-        animationSets[i][j],
-        frameIndex,
-        xPosition,
-        yPosition,
-        colWidth,
-        rowHeight,
-      );
+      ellipse(0, 0, colWidth, rowHeight);
+      animate(animationSets[i][j], frameIndex, 0, 0, colWidth, rowHeight);
 
       // Debug coordinates
-      push();
+      /* push();
       fill(255);
       textAlign(CENTER, CENTER);
       textSize(14);
-      text(
-        `[${i}][${j}]`,
-        i * colWidth + colWidth / 2,
-        j * rowHeight + rowHeight / 2,
-      );
+      text(`[${i}][${j}]`, 0, 0);
+      pop(); */
       pop();
     }
   }
 
-  /* animate(frames, 15, 670, width / 2, 300, 150);
-  animate(frames, 5, 410, width / 2, undefined, 300);
-  animate(frames, 10, 150, width / 2, 200, 300); */
+  if (hoveredCol !== -1 && hoveredRow !== -1) {
+    let targetX = hoveredCol * colWidth + colWidth / 2;
+    let targetY = hoveredRow * rowHeight + rowHeight / 2;
+    let targetFrameIndex = Math.floor(
+      animationProgress[hoveredCol][hoveredRow],
+    );
+
+    push();
+    translate(targetX, targetY);
+    scale(1.3);
+    fill(colors[hoveredCol][hoveredRow]);
+    ellipse(0, 0, colWidth, rowHeight);
+    animate(
+      animationSets[hoveredCol][hoveredRow],
+      targetFrameIndex,
+      0,
+      0,
+      colWidth,
+      rowHeight,
+    );
+    pop();
+  }
 }
 
 function animate(
