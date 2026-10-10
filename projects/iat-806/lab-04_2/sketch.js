@@ -1,12 +1,20 @@
 // frame arrays
-let frames = [];
-let frames2 = [];
+let monikaDance = [];
+let monikaDanceCreepy = [];
+let monikaJump = [];
+let monikaJumpCreepy = [];
+
+// define images
+let chatImage;
+let backgroundImage;
 
 // sound effect variables
 let hoverSound;
+let backgroundSound;
 let lastHoveredCol = -1;
 let lastHoveredRow = -1;
 let audioEnabled = false;
+let backgroundSoundStarted = false;
 
 // frame count per move, might make it parametric later
 let numFrames = 8;
@@ -15,8 +23,11 @@ let numFrames = 8;
 let minSpeed = 2;
 let maxSpeed = 20;
 // define column and row variables
-let numCols = 7;
-let numRows = 7;
+let numCols = 9;
+let numRows = 9;
+const gridWidth = 900;
+const gridHeight = 900;
+const extraCanvasHeight = 200;
 
 // dimensions of each cell
 let colWidth;
@@ -29,7 +40,7 @@ let animationSets = [];
 let lastAnimationSteps = [];
 
 async function setup() {
-  createCanvas(900, 900);
+  createCanvas(gridWidth, gridHeight + extraCanvasHeight);
 
   for (let i = 0; i < numCols; i++) {
     // create new array for each index as a 2nd dimension
@@ -48,29 +59,38 @@ async function setup() {
   for (let i = 0; i < numFrames; i++) {
     // let fileName = `dance_frames/dance${i}.png`; (this also works)
     let fileName = "monika_dance/dance" + i + ".png";
-    frames.push(await loadImage(fileName));
+    monikaDance.push(await loadImage(fileName));
+    fileName = "monika_jump/jump" + i + ".png";
+    monikaJump.push(await loadImage(fileName));
   }
   for (let i = 8; i < numFrames * 2; i++) {
     fileName = "monika_dance/dance" + i + ".png";
-    frames2.push(await loadImage(fileName));
+    monikaDanceCreepy.push(await loadImage(fileName));
+    fileName = "monika_jump/jump" + i + ".png";
+    monikaJumpCreepy.push(await loadImage(fileName));
   }
+
+  // load images
+  chatImage = await loadImage("images/chat.png");
+  backgroundImage = await loadImage("images/background.png");
 
   // load hover sound effect
   hoverSound = await loadSound("sounds/boop.mp3");
+  backgroundSound = await loadSound("sounds/dokidoki.mp3");
 }
 
 // check which cell is hovered
 function getHoveredCell() {
   let hoveredCol;
-  // mouse position / width and height to find hovered cell indices, -1 if it is outside border
-  if (mouseX >= 0 && mouseX < width) {
-    hoveredCol = Math.floor(mouseX / (width / numCols));
+  // The grid occupies only the original 900x900 area of the canvas.
+  if (mouseX >= 0 && mouseX < gridWidth) {
+    hoveredCol = Math.floor(mouseX / (gridWidth / numCols));
   } else {
     hoveredCol = -1;
   }
   let hoveredRow;
-  if (mouseY >= 0 && mouseY < height) {
-    hoveredRow = Math.floor(mouseY / (height / numRows));
+  if (mouseY >= 0 && mouseY < gridHeight) {
+    hoveredRow = Math.floor(mouseY / (gridHeight / numRows));
   } else {
     hoveredRow = -1;
   }
@@ -84,6 +104,10 @@ async function mousePressed() {
   try {
     await userStartAudio();
     audioEnabled = true;
+    if (!backgroundSoundStarted && backgroundSound) {
+      backgroundSound.play();
+      backgroundSoundStarted = true;
+    }
     // assign array coming from getHoveredCell to new one here
     let [hoveredCol, hoveredRow] = getHoveredCell();
     // check when hovered cell changes
@@ -115,12 +139,14 @@ function mouseMoved() {
 }
 
 function draw() {
-  background(0);
+  // draw background
+  imageMode(CORNER);
+  image(backgroundImage, 0, 0, width, height);
 
   // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
-  colWidth = width / numCols;
-  rowHeight = height / numRows;
-  let maxDistance = dist(0, 0, width, height);
+  colWidth = gridWidth / numCols;
+  rowHeight = gridHeight / numRows;
+  let maxDistance = dist(0, 0, gridWidth, gridHeight);
   // get the hovered cell indices
   let [hoveredCol, hoveredRow] = getHoveredCell();
   // main nested loop
@@ -133,7 +159,7 @@ function draw() {
       let distTemp = dist(mouseX, mouseY, xPosition, yPosition);
       // map distance to speed and constrain it between min and max
       let speedTemp = constrain(
-        map(distTemp, 0, 500, minSpeed, maxSpeed),
+        map(distTemp, 0, 500, maxSpeed, minSpeed),
         minSpeed,
         maxSpeed,
       );
@@ -141,15 +167,15 @@ function draw() {
       let frames2Chance = constrain(distTemp / maxDistance, 0, 1);
       animationProgress[i][j] =
         (animationProgress[i][j] + deltaTime / ((1000 / 60) * speedTemp)) %
-        frames.length;
+        numFrames;
       // frameIndex stays the same because math.floor
       let frameIndex = Math.floor(animationProgress[i][j]);
       // check if current frameIndex is the same as lastAnimationStep, then switch frame sets by chance
       if (frameIndex !== lastAnimationSteps[i][j]) {
         if (random() < frames2Chance) {
-          animationSets[i][j] = frames2;
+          animationSets[i][j] = monikaDanceCreepy;
         } else {
-          animationSets[i][j] = frames;
+          animationSets[i][j] = monikaDance;
         }
         lastAnimationSteps[i][j] = frameIndex;
       }
@@ -158,8 +184,15 @@ function draw() {
         continue;
       }
 
-      fill(colors[i][j]);
-      ellipse(xPosition, yPosition, colWidth, rowHeight);
+      let cellColor = colors[i][j];
+      noStroke();
+      fill(red(cellColor), green(cellColor), blue(cellColor), 100);
+      rect(
+        xPosition - colWidth / 2,
+        yPosition - rowHeight / 2,
+        colWidth,
+        rowHeight,
+      );
       animate(
         animationSets[i][j],
         frameIndex,
@@ -183,26 +216,30 @@ function draw() {
     let targetFrameIndex = Math.floor(
       animationProgress[hoveredCol][hoveredRow],
     );
+    let hoveredAnimation =
+      animationSets[hoveredCol][hoveredRow] === monikaDanceCreepy
+        ? monikaJumpCreepy
+        : monikaJump;
 
     // drawing the hovered cell which was skipped
     // using push/pop, translate, and scale, to scale everything from center
     push();
     translate(targetX, targetY);
-    scale(1.3);
-    fill(colors[hoveredCol][hoveredRow]);
+    scale(3);
+    let hoveredColor = colors[hoveredCol][hoveredRow];
+    fill(red(hoveredColor), green(hoveredColor), blue(hoveredColor), 150);
     stroke(255);
-    ellipse(0, 0, colWidth, rowHeight);
+    rect(-colWidth / 2, -rowHeight / 2, colWidth, rowHeight);
     noStroke();
-    animate(
-      animationSets[hoveredCol][hoveredRow],
-      targetFrameIndex,
-      0,
-      0,
-      colWidth,
-      rowHeight,
-    );
+    animate(hoveredAnimation, targetFrameIndex, 0, 0, colWidth, rowHeight);
     pop();
   }
+
+  // load chat image
+  imageMode(CORNER);
+  tint(255, 225);
+  image(chatImage, 0, gridHeight, gridWidth, extraCanvasHeight);
+  noTint();
 }
 
 // animate function
