@@ -1,5 +1,9 @@
 let frames = [];
 let frames2 = [];
+let hoverSound;
+let lastHoveredCol = -1;
+let lastHoveredRow = -1;
+let audioEnabled = false;
 
 let numFrames = 8;
 
@@ -37,6 +41,47 @@ async function setup() {
     frames.push(await loadImage(fileName));
     fileName = "dance_frames2/dance" + i + ".png";
     frames2.push(await loadImage(fileName));
+  }
+
+  hoverSound = await loadSound("sounds/boop.mp3");
+}
+
+function getHoveredCell() {
+  let hoveredCol =
+    mouseX >= 0 && mouseX < width ? Math.floor(mouseX / (width / numCols)) : -1;
+  let hoveredRow =
+    mouseY >= 0 && mouseY < height ? Math.floor(mouseY / (height / numRows)) : -1;
+
+  return { col: hoveredCol, row: hoveredRow };
+}
+
+async function mousePressed() {
+  try {
+    await userStartAudio();
+    audioEnabled = true;
+    let { col: hoveredCol, row: hoveredRow } = getHoveredCell();
+    lastHoveredCol = hoveredCol;
+    lastHoveredRow = hoveredRow;
+    if (hoveredCol !== -1 && hoveredRow !== -1 && hoverSound) {
+      hoverSound.play();
+    }
+  } catch (error) {
+    console.error("Unable to enable hover audio:", error);
+  }
+}
+
+function mouseMoved() {
+  let { col: hoveredCol, row: hoveredRow } = getHoveredCell();
+
+  if (hoveredCol === lastHoveredCol && hoveredRow === lastHoveredRow) {
+    return;
+  }
+
+  lastHoveredCol = hoveredCol;
+  lastHoveredRow = hoveredRow;
+
+  if (hoveredCol !== -1 && hoveredRow !== -1 && audioEnabled && hoverSound) {
+    hoverSound.play();
   }
 }
 
@@ -99,7 +144,9 @@ function draw() {
     translate(targetX, targetY);
     scale(1.3);
     fill(colors[hoveredCol][hoveredRow]);
+    stroke(255);
     ellipse(0, 0, colWidth, rowHeight);
+    noStroke();
     animate(
       animationSets[hoveredCol][hoveredRow],
       targetFrameIndex,
