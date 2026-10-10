@@ -1,16 +1,24 @@
+// frame arrays
 let frames = [];
 let frames2 = [];
+
+// sound effect variables
 let hoverSound;
 let lastHoveredCol = -1;
 let lastHoveredRow = -1;
 let audioEnabled = false;
 
+// frame count per move, might make it parametric later
 let numFrames = 8;
 
+// min and max speed
+let minSpeed = 2;
+let maxSpeed = 20;
 // define column and row variables
-let numCols = 9;
-let numRows = 9;
+let numCols = 7;
+let numRows = 7;
 
+// dimensions of each cell
 let colWidth;
 let rowHeight;
 
@@ -24,42 +32,61 @@ async function setup() {
   createCanvas(900, 900);
 
   for (let i = 0; i < numCols; i++) {
+    // create new array for each index as a 2nd dimension
     colors[i] = [];
     animationProgress[i] = [];
     animationSets[i] = [];
     lastAnimationSteps[i] = [];
     for (let j = 0; j < numRows; j++) {
       colors[i][j] = color(random(255), random(255), random(255));
+
+      // record animation progress for each cell
       animationProgress[i][j] = 0;
       lastAnimationSteps[i][j] = -1;
     }
   }
-
   for (let i = 0; i < numFrames; i++) {
-    // let fileName = `dance_frames/dance${i}.png`;
-    let fileName = "dance_frames/dance" + i + ".png";
+    // let fileName = `dance_frames/dance${i}.png`; (this also works)
+    let fileName = "monika_dance/dance" + i + ".png";
     frames.push(await loadImage(fileName));
-    fileName = "dance_frames2/dance" + i + ".png";
+  }
+  for (let i = 8; i < numFrames * 2; i++) {
+    fileName = "monika_dance/dance" + i + ".png";
     frames2.push(await loadImage(fileName));
   }
 
+  // load hover sound effect
   hoverSound = await loadSound("sounds/boop.mp3");
 }
 
+// check which cell is hovered
 function getHoveredCell() {
-  let hoveredCol =
-    mouseX >= 0 && mouseX < width ? Math.floor(mouseX / (width / numCols)) : -1;
-  let hoveredRow =
-    mouseY >= 0 && mouseY < height ? Math.floor(mouseY / (height / numRows)) : -1;
-
-  return { col: hoveredCol, row: hoveredRow };
+  let hoveredCol;
+  // mouse position / width and height to find hovered cell indices, -1 if it is outside border
+  if (mouseX >= 0 && mouseX < width) {
+    hoveredCol = Math.floor(mouseX / (width / numCols));
+  } else {
+    hoveredCol = -1;
+  }
+  let hoveredRow;
+  if (mouseY >= 0 && mouseY < height) {
+    hoveredRow = Math.floor(mouseY / (height / numRows));
+  } else {
+    hoveredRow = -1;
+  }
+  // returns an array
+  return [hoveredCol, hoveredRow];
 }
 
+// audio plays only after mouse is pressed and mouse is inside borders
+// also there is a try/catch thing here, will see how it works
 async function mousePressed() {
   try {
     await userStartAudio();
     audioEnabled = true;
-    let { col: hoveredCol, row: hoveredRow } = getHoveredCell();
+    // assign array coming from getHoveredCell to new one here
+    let [hoveredCol, hoveredRow] = getHoveredCell();
+    // check when hovered cell changes
     lastHoveredCol = hoveredCol;
     lastHoveredRow = hoveredRow;
     if (hoveredCol !== -1 && hoveredRow !== -1 && hoverSound) {
@@ -70,8 +97,10 @@ async function mousePressed() {
   }
 }
 
+// when mouse is moved, if hovered cell changes, play sound effect
+// we can do it in draw() as well like in each frame, but lets try it this way
 function mouseMoved() {
-  let { col: hoveredCol, row: hoveredRow } = getHoveredCell();
+  let [hoveredCol, hoveredRow] = getHoveredCell();
 
   if (hoveredCol === lastHoveredCol && hoveredRow === lastHoveredRow) {
     return;
@@ -88,48 +117,63 @@ function mouseMoved() {
 function draw() {
   background(0);
 
+  // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
   colWidth = width / numCols;
   rowHeight = height / numRows;
   let maxDistance = dist(0, 0, width, height);
-  let hoveredCol =
-    mouseX >= 0 && mouseX < width ? Math.floor(mouseX / colWidth) : -1;
-  let hoveredRow =
-    mouseY >= 0 && mouseY < height ? Math.floor(mouseY / rowHeight) : -1;
-
+  // get the hovered cell indices
+  let [hoveredCol, hoveredRow] = getHoveredCell();
+  // main nested loop
   for (let i = 0; i < numCols; i++) {
     for (let j = 0; j < numRows; j++) {
+      // using center of each cell
       let xPosition = i * colWidth + colWidth / 2;
       let yPosition = j * rowHeight + rowHeight / 2;
+      // distance to mouse position
       let distTemp = dist(mouseX, mouseY, xPosition, yPosition);
-      let speedTemp = map(distTemp, 0, 500, 2, 20);
+      // map distance to speed and constrain it between min and max
+      let speedTemp = constrain(
+        map(distTemp, 0, 500, minSpeed, maxSpeed),
+        minSpeed,
+        maxSpeed,
+      );
+      // map distance to frames2Chance, but division is good enough here
       let frames2Chance = constrain(distTemp / maxDistance, 0, 1);
       animationProgress[i][j] =
         (animationProgress[i][j] + deltaTime / ((1000 / 60) * speedTemp)) %
         frames.length;
+      // frameIndex stays the same because math.floor
       let frameIndex = Math.floor(animationProgress[i][j]);
+      // check if current frameIndex is the same as lastAnimationStep, then switch frame sets by chance
       if (frameIndex !== lastAnimationSteps[i][j]) {
-        animationSets[i][j] = random() < frames2Chance ? frames2 : frames;
+        if (random() < frames2Chance) {
+          animationSets[i][j] = frames2;
+        } else {
+          animationSets[i][j] = frames;
+        }
         lastAnimationSteps[i][j] = frameIndex;
       }
-
+      // hovered cell is skipped to be drawn later
       if (i === hoveredCol && j === hoveredRow) {
         continue;
       }
 
-      push();
-      translate(xPosition, yPosition);
       fill(colors[i][j]);
-      ellipse(0, 0, colWidth, rowHeight);
-      animate(animationSets[i][j], frameIndex, 0, 0, colWidth, rowHeight);
+      ellipse(xPosition, yPosition, colWidth, rowHeight);
+      animate(
+        animationSets[i][j],
+        frameIndex,
+        xPosition,
+        yPosition,
+        colWidth,
+        rowHeight,
+      );
 
       // Debug coordinates
-      /* push();
-      fill(255);
+      /* fill(255);
       textAlign(CENTER, CENTER);
       textSize(14);
-      text(`[${i}][${j}]`, 0, 0);
-      pop(); */
-      pop();
+      text(`[${i}][${j}]`, xPosition, yPosition); */
     }
   }
 
@@ -140,6 +184,8 @@ function draw() {
       animationProgress[hoveredCol][hoveredRow],
     );
 
+    // drawing the hovered cell which was skipped
+    // using push/pop, translate, and scale, to scale everything from center
     push();
     translate(targetX, targetY);
     scale(1.3);
@@ -159,6 +205,7 @@ function draw() {
   }
 }
 
+// animate function
 function animate(
   frames,
   frameIndex,
