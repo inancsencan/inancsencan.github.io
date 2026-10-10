@@ -6,7 +6,6 @@ let monikaJumpCreepy = [];
 
 // define images
 let chatImage;
-let backgroundImage;
 
 // sound effect variables
 let hoverSound;
@@ -22,18 +21,26 @@ let numFrames = 8;
 // min and max speed
 let minSpeed = 2;
 let maxSpeed = 20;
+
 // define column and row variables
 let numCols = 9;
 let numRows = 9;
 const gridWidth = 900;
 const gridHeight = 900;
 const extraCanvasHeight = 200;
+const backgroundStages = [
+  { time: 0, imagePath: "images/background.png" },
+  { time: 2 * 60 + 6, imagePath: "images/background2.png" },
+];
 
 // dimensions of each cell
 let colWidth;
 let rowHeight;
 
 let colors = [];
+let stageBackgrounds = [];
+let sketchStartTime;
+
 // track animation progress individually
 let animationProgress = [];
 let animationSets = [];
@@ -72,7 +79,10 @@ async function setup() {
 
   // load images
   chatImage = await loadImage("images/chat.png");
-  backgroundImage = await loadImage("images/background.png");
+  for (const stage of backgroundStages) {
+    stageBackgrounds.push(await loadImage(stage.imagePath));
+  }
+  sketchStartTime = millis();
 
   // load hover sound effect
   hoverSound = await loadSound("sounds/boop.mp3");
@@ -140,8 +150,15 @@ function mouseMoved() {
 
 function draw() {
   // draw background
+  let elapsedTime = (millis() - sketchStartTime) / 1000;
+  let currentStage = 0;
+  for (let i = 1; i < backgroundStages.length; i++) {
+    if (elapsedTime >= backgroundStages[i].time) {
+      currentStage = i;
+    }
+  }
   imageMode(CORNER);
-  image(backgroundImage, 0, 0, width, height);
+  image(stageBackgrounds[currentStage], 0, 0, width, height);
 
   // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
   colWidth = gridWidth / numCols;
@@ -183,7 +200,7 @@ function draw() {
       if (i === hoveredCol && j === hoveredRow) {
         continue;
       }
-
+      // adding tint to the squares by deconstructing the color and adding alpha
       let cellColor = colors[i][j];
       noStroke();
       fill(red(cellColor), green(cellColor), blue(cellColor), 100);
