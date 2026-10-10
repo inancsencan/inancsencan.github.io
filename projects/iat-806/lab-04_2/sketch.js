@@ -28,9 +28,11 @@ let numRows = 9;
 const gridWidth = 900;
 const gridHeight = 900;
 const extraCanvasHeight = 200;
+
+// define stages for background
 const backgroundStages = [
   { time: 0, imagePath: "images/background.png" },
-  { time: 2 * 60 + 6, imagePath: "images/background2.png" },
+  { time: 2 * 60 + 9, imagePath: "images/background2.png" },
 ];
 
 // dimensions of each cell
@@ -82,7 +84,6 @@ async function setup() {
   for (const stage of backgroundStages) {
     stageBackgrounds.push(await loadImage(stage.imagePath));
   }
-  sketchStartTime = millis();
 
   // load hover sound effect
   hoverSound = await loadSound("sounds/boop.mp3");
@@ -113,6 +114,9 @@ function getHoveredCell() {
 async function mousePressed() {
   try {
     await userStartAudio();
+    if (!audioEnabled) {
+      sketchStartTime = millis();
+    }
     audioEnabled = true;
     if (!backgroundSoundStarted && backgroundSound) {
       backgroundSound.play();
@@ -149,21 +153,26 @@ function mouseMoved() {
 }
 
 function draw() {
-  // draw background
-  let elapsedTime = (millis() - sketchStartTime) / 1000;
+  // start timer when audio is enabled
+  let elapsedTime = audioEnabled ? (millis() - sketchStartTime) / 1000 : 0;
   let currentStage = 0;
+
+  //change stage when timestamp is reached
   for (let i = 1; i < backgroundStages.length; i++) {
     if (elapsedTime >= backgroundStages[i].time) {
       currentStage = i;
     }
   }
+  // draw background
   imageMode(CORNER);
   image(stageBackgrounds[currentStage], 0, 0, width, height);
 
   // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
   colWidth = gridWidth / numCols;
   rowHeight = gridHeight / numRows;
-  let maxDistance = dist(0, 0, gridWidth, gridHeight);
+
+  // chance to go creepy frames increase with time
+  let frames2Chance = constrain(elapsedTime / 120, 0, 1);
   // get the hovered cell indices
   let [hoveredCol, hoveredRow] = getHoveredCell();
   // main nested loop
@@ -180,8 +189,6 @@ function draw() {
         minSpeed,
         maxSpeed,
       );
-      // map distance to frames2Chance, but division is good enough here
-      let frames2Chance = constrain(distTemp / maxDistance, 0, 1);
       animationProgress[i][j] =
         (animationProgress[i][j] + deltaTime / ((1000 / 60) * speedTemp)) %
         numFrames;
