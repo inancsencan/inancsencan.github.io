@@ -41,7 +41,9 @@ function draw() {
 // Ball functions
 // ----
 
-// Ball states
+// Locate at mouse
+
+// Ball stages
 function stage1Behaviour() {
   let r = ballSize / 2;
 
@@ -64,6 +66,21 @@ function drawBall() {
   fill(255);
   noStroke();
   circle(ballPos.x, ballPos.y, ballSize);
+}
+
+// Key pressed functions
+function keyPressed() {
+  if (keyCode === RIGHT_ARROW) {
+    stage++;
+  }
+
+  if (keyCode === LEFT_ARROW) {
+    stage--;
+
+    if (stage < 1) {
+      stage = 1;
+    }
+  }
 }
 
 // function to draw the fake canvas and resize the window accordingly
@@ -129,6 +146,12 @@ function drawFakePage() {
 
   fill(0);
   rect(fakeCanvasX, fakeCanvasY, fakeCanvasSize, fakeCanvasSize);
+
+  //Current stage
+  fill("#8c8c8e");
+  textSize(13);
+  textStyle(NORMAL);
+  text(`Stage: ${stage}`, contentX, 255);
 
   // Notes and the return link follow the canvas, as on the original page.
   noStroke();
