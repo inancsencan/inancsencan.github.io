@@ -1,3 +1,10 @@
+// TODO for myself
+// add 3 more characters
+// scene should start with random characters scattered in the grid
+// the scene should slowly be filled with just monikas
+// bottom chat window gets text, changing in every x seconds
+// after some time, when "just monika" starts playing, monika covers the scene
+
 // frame arrays
 let monikaDance = [];
 let monikaDanceCreepy = [];
@@ -240,10 +247,7 @@ function draw() {
     let targetFrameIndex = Math.floor(
       animationProgress[hoveredCol][hoveredRow],
     );
-    let hoveredAnimation =
-      animationSets[hoveredCol][hoveredRow] === monikaDanceCreepy
-        ? monikaJumpCreepy
-        : monikaJump;
+    let hoveredAnimation = monikaJump;
 
     // drawing the hovered cell which was skipped
     // using push/pop, translate, and scale, to scale everything from center
