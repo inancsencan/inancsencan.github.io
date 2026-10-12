@@ -6,6 +6,7 @@ let femaleDance = []; // TODO: load the jump poses into this array
 let maleRun = [];
 let femaleRun = [];
 let numFrames = 8;
+
 let crowdAudio;
 let trackAudioFiles = [];
 let audioSequenceStarted = false;
@@ -55,7 +56,8 @@ async function setup() {
     "sounds/tracks/ArchEnemy - Ravenous.mp3",
     "sounds/tracks/Children Of Bodom - Are You Dead Yet.mp3",
     "sounds/tracks/Children Of Bodom - Everytime I Die000.mp3",
-    "sounds/tracks/Children Of Bodom - Fear Of The Dark.mp3",
+    "sounds/tracks/Orbit Culture - Vultures of North.mp3",
+    "sounds/tracks/Orbit Culture - Saw.mp3",
   ];
   window.addEventListener("keydown", handleAudioShortcut);
   document
@@ -120,15 +122,15 @@ function mousePressed(event) {
   leftMouseDown = event.button === 0;
 }
 
-function handleAudioShortcut(event) {
-  if (event.key.toLowerCase() === "p" && !event.repeat) {
-    startAudioSequence();
-  }
-}
-
 function mouseReleased(event) {
   if (event.button === 0) {
     leftMouseDown = false;
+  }
+}
+
+function handleAudioShortcut(event) {
+  if (event.key.toLowerCase() === "p" && !event.repeat) {
+    startAudioSequence();
   }
 }
 
