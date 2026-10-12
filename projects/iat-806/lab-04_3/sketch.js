@@ -6,6 +6,13 @@ let femaleDance = []; // TODO: load the jump poses into this array
 let maleRun = [];
 let femaleRun = [];
 let numFrames = 8;
+let crowdAudio;
+let trackAudioFiles = [];
+let audioSequenceStarted = false;
+let trackAudio;
+let audioSequenceStartTime = null;
+let backgroundFrames = [];
+const backgroundFrameRate = 8;
 
 let numCols = 30;
 let numRows = 30;
@@ -26,6 +33,7 @@ let speeds = [];
 let dancerGender = [];
 let dancerMode = [];
 let dancerDirection = [];
+let dancerMisdirection = [];
 
 // scattering dancers
 let dancerOffsets = [];
@@ -42,9 +50,23 @@ let crowdVar = 50;
 async function setup() {
   // resized canvas
   const canvas = createCanvas(900, 900);
+  crowdAudio = new Audio("sounds/crowd.mp3");
+  trackAudioFiles = [
+    "sounds/tracks/ArchEnemy - Ravenous.mp3",
+    "sounds/tracks/Children Of Bodom - Are You Dead Yet.mp3",
+    "sounds/tracks/Children Of Bodom - Everytime I Die000.mp3",
+    "sounds/tracks/Children Of Bodom - Fear Of The Dark.mp3",
+  ];
+  window.addEventListener("keydown", handleAudioShortcut);
+  document
+    .getElementById("start-audio")
+    .addEventListener("click", startAudioSequence);
 
   // load background image
   backgroundImage = await loadImage("background.png");
+  for (let i = 1; i <= 8; i++) {
+    backgroundFrames.push(await loadImage("bg_frames/bg" + i + ".png"));
+  }
 
   // puts the canvas inside <div id="sketch-holder"> in index.html
   canvas.parent("sketch-holder");
@@ -59,6 +81,7 @@ async function setup() {
     dancerGender[i] = [];
     dancerMode[i] = [];
     dancerDirection[i] = [];
+    dancerMisdirection[i] = [];
     dancerOffsets[i] = [];
 
     //crowd position variations turned into 2d array
@@ -74,6 +97,7 @@ async function setup() {
       // default mode
       dancerMode[i][j] = "dance";
       dancerDirection[i][j] = 1;
+      dancerMisdirection[i][j] = random(-Math.PI / 12, Math.PI / 12);
 
       // dancer offset randomization
       dancerOffsets[i][j] = createVector(0, 0);
@@ -96,15 +120,72 @@ function mousePressed(event) {
   leftMouseDown = event.button === 0;
 }
 
+function handleAudioShortcut(event) {
+  if (event.key.toLowerCase() === "p" && !event.repeat) {
+    startAudioSequence();
+  }
+}
+
 function mouseReleased(event) {
   if (event.button === 0) {
     leftMouseDown = false;
   }
 }
 
+async function startAudioSequence() {
+  if (audioSequenceStarted) {
+    return;
+  }
+
+  audioSequenceStarted = true;
+  const status = document.getElementById("audio-status");
+
+  try {
+    crowdAudio.currentTime = 0;
+    await crowdAudio.play();
+    audioSequenceStartTime = millis();
+    status.textContent =
+      "Crowd audio playing. A random track starts in 15 seconds.";
+
+    setTimeout(
+      async () => {
+        crowdAudio.pause();
+        const randomTrackFile = random(trackAudioFiles);
+        trackAudio = new Audio(randomTrackFile);
+        try {
+          await trackAudio.play();
+          status.textContent = "Random track playing.";
+        } catch (error) {
+          status.textContent =
+            "The music track could not start. Check the browser console for details.";
+          console.error("Unable to play the selected music track:", error);
+        }
+      },
+      Math.max(0, 15000 - (millis() - audioSequenceStartTime)),
+    );
+  } catch (error) {
+    audioSequenceStarted = false;
+    audioSequenceStartTime = null;
+    crowdAudio.pause();
+    crowdAudio.currentTime = 0;
+    status.textContent =
+      "Audio could not start. Check the browser console for details.";
+    console.error("Unable to start the audio sequence:", error);
+  }
+}
+
 function draw() {
-  //draw background
-  image(backgroundImage, 0, 0, width, height);
+  let currentBackground = backgroundImage;
+  if (audioSequenceStartTime !== null) {
+    let elapsedAfterCrowd = millis() - audioSequenceStartTime - 15000;
+    if (elapsedAfterCrowd >= 0) {
+      let frameIndex =
+        Math.floor((elapsedAfterCrowd / 1000) * backgroundFrameRate) %
+        backgroundFrames.length;
+      currentBackground = backgroundFrames[frameIndex];
+    }
+  }
+  image(currentBackground, 0, 0, width, height);
 
   let mousePosition = createVector(mouseX, mouseY);
   let offsetEase = 1 - Math.exp(-deltaTime / 700);
@@ -137,9 +218,9 @@ function draw() {
 
       if (leftMouseDown && distanceToMouse < mouseGapRadius) {
         let swayPhase = swayTime * 3 + i * 0.7 + j * 1.1;
-        let moshpitTarget = p5.Vector.sub(mousePosition, dancerPosition).add(
-          createVector(Math.sin(swayPhase) * 8, Math.cos(swayPhase) * 8),
-        );
+        let moshpitTarget = p5.Vector.sub(mousePosition, dancerPosition)
+          .rotate(dancerMisdirection[i][j])
+          .add(createVector(Math.sin(swayPhase) * 8, Math.cos(swayPhase) * 8));
         targetOffset = moshpitTarget;
       }
 
