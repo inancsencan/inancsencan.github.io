@@ -2,6 +2,18 @@
 // bottom chat window gets text, changing in every x seconds
 // after some time, when "just monika" starts playing, monika covers the scene
 
+// - Interactions -
+// Press "left mouse button" to start playing the audio
+// Move mouse to hover over "different" characters
+// Has hovering sound effect
+// Randomized cell bg colours, with alpha
+// Randomized initial character selection
+// Something happens to the characters slowly...?
+// Hovered character jumps with excitement! Wonder which one is being picked :)
+// Chat dialogue is... interesting.
+// Scene changes when going to the next audio track..
+// Is this all, or something changes after some time? Who knows...
+
 // frame arrays
 let monikaDance = [];
 let monikaDanceCreepy = [];
@@ -59,7 +71,11 @@ let animationSets = [];
 let creepyThresholds = [];
 
 async function setup() {
-  createCanvas(gridWidth, gridHeight + extraCanvasHeight);
+  // defines canvas
+  const canvas = createCanvas(gridWidth, gridHeight + extraCanvasHeight);
+
+  // puts the canvas inside <div id="sketch-holder"> in index.html
+  canvas.parent("sketch-holder");
 
   for (let i = 0; i < numCols; i++) {
     // create new array for each index as a 2nd dimension
