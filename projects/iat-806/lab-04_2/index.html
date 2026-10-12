@@ -3,16 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lab 04_2 — Doki Doki</title>
+    <title>Lab 04_3 — Moshpit!</title>
 
     <!-- Three folders deep, so three levels up to the stylesheet -->
     <link rel="stylesheet" href="../../../style.css" />
 
     <!-- p5.js, version 2.3.3. Every sketch page needs this line. -->
     <script src="https://cdn.jsdelivr.net/npm/p5@2.3.3/lib/p5.min.js"></script>
-
-    <!-- p5.sound, the sound add-on. Must come after p5.js and before sketch.js. -->
-    <script src="https://cdn.jsdelivr.net/npm/p5.sound@0.4.1/dist/p5.sound.min.js"></script>
 
     <!-- Your code. Keep this line last. -->
     <script src="sketch.js"></script>
@@ -29,10 +26,14 @@
     <main>
       <a class="back" href="../index.html">&larr; IAT 806</a>
 
-      <h1>Lab 04_2 — Doki Doki</h1>
-      <p class="tagline">
-        A small js edition of the cute little game "Doki Doki Literature Club".
+      <h1>Lab 04_3 — Moshpit!</h1>
+      <p class="tagline">Create moshpits in the festival</p>
+      <p>
+        Press P or use the button to start the crowd audio, followed by a random
+        track after 15 seconds.
       </p>
+      <button id="start-audio" type="button">Start audio</button>
+      <p id="audio-status" aria-live="polite">Audio has not started.</p>
 
       <!-- The canvas p5 creates gets placed right here. -->
       <div id="sketch-holder"></div>
