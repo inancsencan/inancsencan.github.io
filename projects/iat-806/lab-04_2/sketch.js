@@ -1,7 +1,4 @@
 // TODO for myself
-// add 3 more characters
-// scene should start with random characters scattered in the grid
-// the scene should slowly be filled with just monikas
 // bottom chat window gets text, changing in every x seconds
 // after some time, when "just monika" starts playing, monika covers the scene
 
@@ -10,6 +7,12 @@ let monikaDance = [];
 let monikaDanceCreepy = [];
 let monikaJump = [];
 let monikaJumpCreepy = [];
+let natsukiDance = [];
+let natsukiDanceCreepy = [];
+let yuriDance = [];
+let yuriDanceCreepy = [];
+let sayoriDance = [];
+let sayoriDanceCreepy = [];
 
 // define images
 let chatImage;
@@ -53,7 +56,7 @@ let sketchStartTime;
 // track animation progress individually
 let animationProgress = [];
 let animationSets = [];
-let lastAnimationSteps = [];
+let creepyThresholds = [];
 
 async function setup() {
   createCanvas(gridWidth, gridHeight + extraCanvasHeight);
@@ -63,13 +66,13 @@ async function setup() {
     colors[i] = [];
     animationProgress[i] = [];
     animationSets[i] = [];
-    lastAnimationSteps[i] = [];
+    creepyThresholds[i] = [];
     for (let j = 0; j < numRows; j++) {
       colors[i][j] = color(random(255), random(255), random(255));
 
       // record animation progress for each cell
       animationProgress[i][j] = 0;
-      lastAnimationSteps[i][j] = -1;
+      creepyThresholds[i][j] = random();
     }
   }
   for (let i = 0; i < numFrames; i++) {
@@ -84,6 +87,23 @@ async function setup() {
     monikaDanceCreepy.push(await loadImage(fileName));
     fileName = "monika_jump/jump" + i + ".png";
     monikaJumpCreepy.push(await loadImage(fileName));
+    natsukiDanceCreepy.push(
+      await loadImage("natsuki_dance/dance" + i + ".png"),
+    );
+    yuriDanceCreepy.push(await loadImage("yuri_dance/dance" + i + ".png"));
+    sayoriDanceCreepy.push(await loadImage("sayori_dance/dance" + i + ".png"));
+  }
+  for (let i = 0; i < numFrames; i++) {
+    natsukiDance.push(await loadImage("natsuki_dance/dance" + i + ".png"));
+    yuriDance.push(await loadImage("yuri_dance/dance" + i + ".png"));
+    sayoriDance.push(await loadImage("sayori_dance/dance" + i + ".png"));
+  }
+
+  const startingDanceSets = [monikaDance, natsukiDance, yuriDance, sayoriDance];
+  for (let i = 0; i < numCols; i++) {
+    for (let j = 0; j < numRows; j++) {
+      animationSets[i][j] = random(startingDanceSets);
+    }
   }
 
   // load images
@@ -178,8 +198,10 @@ function draw() {
   colWidth = gridWidth / numCols;
   rowHeight = gridHeight / numRows;
 
-  // chance to go creepy frames increase with time
-  let frames2Chance = constrain(elapsedTime / 120, 0, 1);
+  // Chance of changing to each character's creepy dance increases with time.
+  let creepyChance = constrain(elapsedTime / 120, 0, 1);
+  console.log(creepyChance);
+
   // get the hovered cell indices
   let [hoveredCol, hoveredRow] = getHoveredCell();
   // main nested loop
@@ -201,28 +223,26 @@ function draw() {
         numFrames;
       // frameIndex stays the same because math.floor
       let frameIndex = Math.floor(animationProgress[i][j]);
-      // check if current frameIndex is the same as lastAnimationStep, then switch frame sets by chance
-      if (frameIndex !== lastAnimationSteps[i][j]) {
-        if (random() < frames2Chance) {
-          animationSets[i][j] = monikaDanceCreepy;
-        } else {
-          animationSets[i][j] = monikaDance;
-        }
-        lastAnimationSteps[i][j] = frameIndex;
+      // Switch each character once its individual transition point is reached.
+      if (
+        creepyChance >= creepyThresholds[i][j] &&
+        !isCreepyDanceSet(animationSets[i][j])
+      ) {
+        animationSets[i][j] = getCreepyDanceSet(animationSets[i][j]);
       }
       // hovered cell is skipped to be drawn later
       if (i === hoveredCol && j === hoveredRow) {
         continue;
       }
-      // adding tint to the squares by deconstructing the color and adding alpha
       let cellColor = colors[i][j];
-      noStroke();
-      fill(red(cellColor), green(cellColor), blue(cellColor), 100);
-      rect(
-        xPosition - colWidth / 2,
-        yPosition - rowHeight / 2,
+      drawCharacterShape(
+        animationSets[i][j],
+        xPosition,
+        yPosition,
         colWidth,
         rowHeight,
+        cellColor,
+        100,
       );
       animate(
         animationSets[i][j],
@@ -254,11 +274,16 @@ function draw() {
     push();
     translate(targetX, targetY);
     scale(3);
-    let hoveredColor = colors[hoveredCol][hoveredRow];
-    fill(red(hoveredColor), green(hoveredColor), blue(hoveredColor), 150);
-    stroke(255);
-    rect(-colWidth / 2, -rowHeight / 2, colWidth, rowHeight);
-    noStroke();
+    drawCharacterShape(
+      monikaDance,
+      0,
+      0,
+      colWidth,
+      rowHeight,
+      colors[hoveredCol][hoveredRow],
+      150,
+      true,
+    );
     animate(hoveredAnimation, targetFrameIndex, 0, 0, colWidth, rowHeight);
     pop();
   }
@@ -268,6 +293,77 @@ function draw() {
   tint(255, 225);
   image(chatImage, 0, gridHeight, gridWidth, extraCanvasHeight);
   noTint();
+}
+
+function getCreepyDanceSet(frames) {
+  if (frames === monikaDance || frames === monikaDanceCreepy) {
+    return monikaDanceCreepy;
+  }
+  if (frames === natsukiDance || frames === natsukiDanceCreepy) {
+    return natsukiDanceCreepy;
+  }
+  if (frames === yuriDance || frames === yuriDanceCreepy) {
+    return yuriDanceCreepy;
+  }
+  return sayoriDanceCreepy;
+}
+
+function isCreepyDanceSet(frames) {
+  return (
+    frames === monikaDanceCreepy ||
+    frames === natsukiDanceCreepy ||
+    frames === yuriDanceCreepy ||
+    frames === sayoriDanceCreepy
+  );
+}
+
+function drawCharacterShape(
+  frames,
+  xPosition,
+  yPosition,
+  shapeWidth,
+  shapeHeight,
+  cellColor,
+  alpha,
+  highlighted = false,
+) {
+  if (highlighted) {
+    stroke(255);
+  } else {
+    noStroke();
+  }
+  fill(red(cellColor), green(cellColor), blue(cellColor), alpha);
+
+  if (frames === sayoriDance || frames === sayoriDanceCreepy) {
+    ellipse(xPosition, yPosition, shapeWidth, shapeHeight);
+  } else if (frames === natsukiDance || frames === natsukiDanceCreepy) {
+    triangle(
+      xPosition,
+      yPosition - shapeHeight / 2,
+      xPosition - shapeWidth / 2,
+      yPosition + shapeHeight / 2,
+      xPosition + shapeWidth / 2,
+      yPosition + shapeHeight / 2,
+    );
+  } else if (frames === yuriDance || frames === yuriDanceCreepy) {
+    quad(
+      xPosition,
+      yPosition - shapeHeight / 2,
+      xPosition + shapeWidth / 2,
+      yPosition,
+      xPosition,
+      yPosition + shapeHeight / 2,
+      xPosition - shapeWidth / 2,
+      yPosition,
+    );
+  } else {
+    rect(
+      xPosition - shapeWidth / 2,
+      yPosition - shapeHeight / 2,
+      shapeWidth,
+      shapeHeight,
+    );
+  }
 }
 
 // animate function

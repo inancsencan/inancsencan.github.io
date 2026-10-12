@@ -177,7 +177,10 @@ async function startAudioSequence() {
 }
 
 function draw() {
+  // default background
   let currentBackground = backgroundImage;
+
+  //animate bg images
   if (audioSequenceStartTime !== null) {
     let elapsedAfterCrowd = millis() - audioSequenceStartTime - 15000;
     if (elapsedAfterCrowd >= 0) {
