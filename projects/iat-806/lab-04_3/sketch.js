@@ -3,30 +3,41 @@
 
 let maleDance = []; // the 8 dance poses
 let femaleDance = []; // TODO: load the jump poses into this array
+let maleRun = [];
+let femaleRun = [];
 let numFrames = 8;
 
 let numCols = 30;
 let numRows = 30;
 let colWidth;
 let rowHeight;
-const mouseGapRadius = 120;
 
 // crowd area
-let topOffset = 160;
+let topOffset = 180;
 let sideOffset = 160;
 
 //background image
 let backgroundImage;
 
 // 2D arrays: one color and one speed for every cell in the grid
-let colors = [];
 let speeds = [];
+
+// setting dancerGender at the beginning to keep it consistent
+let dancerGender = [];
+let dancerMode = [];
+let dancerDirection = [];
+
+// scattering dancers
 let dancerOffsets = [];
+
+// mouse holding toggle
 let leftMouseDown = false;
+const mouseGapRadius = 120;
 
 //crowd position variations
 let varX = [];
 let varY = [];
+let crowdVar = 50;
 
 async function setup() {
   // resized canvas
@@ -43,27 +54,44 @@ async function setup() {
   colWidth = (width - sideOffset * 2) / numCols;
 
   for (let i = 0; i < numCols; i++) {
-    colors[i] = [];
+    // adding 2nd layers of arrays
     speeds[i] = [];
+    dancerGender[i] = [];
+    dancerMode[i] = [];
+    dancerDirection[i] = [];
     dancerOffsets[i] = [];
+
     //crowd position variations turned into 2d array
     varX[i] = [];
     varY[i] = [];
     for (let j = 0; j < numRows; j++) {
-      colors[i][j] = [random(1, 255), random(1, 255), random(1, 255)];
-      speeds[i][j] = random(1, 10);
+      // random speeds
+      speeds[i][j] = random(5, 10);
+
+      // assign gender once, not every frame
+      dancerGender[i][j] = (i + j) % 2 === 0 ? "male" : "female";
+
+      // default mode
+      dancerMode[i][j] = "dance";
+      dancerDirection[i][j] = 1;
+
+      // dancer offset randomization
       dancerOffsets[i][j] = createVector(0, 0);
-      varX[i][j] = random(0, colWidth);
-      varY[i][j] = random(0, rowHeight);
+      varX[i][j] = random(-crowdVar, crowdVar);
+      varY[i][j] = random(-crowdVar, crowdVar);
     }
   }
 
+  // filling animation arrays
   for (let i = 0; i < numFrames; i++) {
-    let fileName = "dance_frames/male/dance" + i + ".png";
-    maleDance.push(await loadImage(fileName));
+    maleDance.push(await loadImage("dance_frames/male/dance" + i + ".png"));
+    femaleDance.push(await loadImage("dance_frames/female/dance" + i + ".png"));
+    maleRun.push(await loadImage("run_frames/male/run" + i + ".png"));
+    femaleRun.push(await loadImage("run_frames/female/run" + i + ".png"));
   }
 }
 
+// mouse holding functions
 function mousePressed(event) {
   leftMouseDown = event.button === 0;
 }
@@ -75,21 +103,23 @@ function mouseReleased(event) {
 }
 
 function draw() {
+  //draw background
   image(backgroundImage, 0, 0, width, height);
-  //numCols = Math.floor(map(mouseX, 0, width, 2, 20));
-  // dist the mouse position and the position of the dancing profs
 
   let mousePosition = createVector(mouseX, mouseY);
   let offsetEase = 1 - Math.exp(-deltaTime / 700);
   let swayTime = millis() / 1000;
   let dancers = [];
+
+  // scatter crowd a little randomly
   for (let i = 0; i < numCols; i++) {
     for (let j = 0; j < numRows; j++) {
       let dancerAnchor = createVector(
         sideOffset + i * colWidth + varX[i][j],
         topOffset + j * rowHeight + varY[i][j],
       );
-      let currentFrame = maleDance[getFrameIndex(speeds[i][j])];
+      // picks current frame based on frame index
+      let currentFrame = getCurrentFrame(i, j);
       let dancerPosition = createVector(
         dancerAnchor.x + colWidth,
         dancerAnchor.y + (colWidth * currentFrame.height) / currentFrame.width,
@@ -113,7 +143,18 @@ function draw() {
         targetOffset = moshpitTarget;
       }
 
+      let previousOffset = dancerOffsets[i][j].copy();
       dancerOffsets[i][j].lerp(targetOffset, offsetEase);
+      let movementX = dancerOffsets[i][j].x - previousOffset.x;
+      let movementY = dancerOffsets[i][j].y - previousOffset.y;
+      let movementSpeed =
+        (Math.hypot(movementX, movementY) / Math.max(deltaTime, 1)) * 1000;
+
+      dancerMode[i][j] = movementSpeed > 8 ? "move" : "dance";
+      if (Math.abs(movementX) > 0.1) {
+        dancerDirection[i][j] = movementX > 0 ? 1 : -1;
+      }
+
       let displacement = dancerOffsets[i][j].copy();
       dancers.push({
         col: i,
@@ -134,20 +175,39 @@ function draw() {
     translate(varX[col][row], varY[col][row]);
     translate(dancer.displacement.x, dancer.displacement.y);
     animate(
-      maleDance,
-      speeds[col][row],
+      getCurrentFrame(col, row),
       col * colWidth,
       row * rowHeight,
       colWidth,
+      undefined,
+      dancerDirection[col][row] < 0,
     );
     pop();
   }
 }
 
-// draws one dancer: which poses, how fast, where, and how big
-function animate(frames, speed, xPosition, yPosition, imageWidth, imageHeight) {
-  let index = getFrameIndex(speed);
-  let currentFrame = frames[index];
+// pick current frame by action and gender
+function getCurrentFrame(col, row) {
+  let frames;
+
+  if (dancerMode[col][row] === "move") {
+    frames = dancerGender[col][row] === "male" ? maleRun : femaleRun;
+  } else {
+    frames = dancerGender[col][row] === "male" ? maleDance : femaleDance;
+  }
+
+  return frames[getFrameIndex(speeds[col][row])];
+}
+
+// draws one dancer: which pose, where, and how big
+function animate(
+  currentFrame,
+  xPosition,
+  yPosition,
+  imageWidth,
+  imageHeight,
+  flipHorizontal = false,
+) {
   let originalWidth = currentFrame.width;
   let originalHeight = currentFrame.height;
   if (imageWidth && !imageHeight) {
@@ -171,7 +231,15 @@ function animate(frames, speed, xPosition, yPosition, imageWidth, imageHeight) {
     imageHeight = originalHeight * scale;
   }
 
-  image(currentFrame, xPosition, yPosition, imageWidth * 2, imageHeight * 2);
+  if (flipHorizontal) {
+    push();
+    translate(xPosition + imageWidth, yPosition);
+    scale(-1, 1);
+    image(currentFrame, -imageWidth, 0, imageWidth * 2, imageHeight * 2);
+    pop();
+  } else {
+    image(currentFrame, xPosition, yPosition, imageWidth * 2, imageHeight * 2);
+  }
 }
 
 // which pose to show right now. speed = draw-frames per pose: smaller = faster
