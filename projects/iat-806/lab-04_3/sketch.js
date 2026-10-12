@@ -185,7 +185,7 @@ function draw() {
     let elapsedAfterCrowd = millis() - audioSequenceStartTime - 15000;
     if (elapsedAfterCrowd >= 0) {
       let frameIndex =
-        Math.floor((elapsedAfterCrowd / 1000) * backgroundFrameRate) %
+        Math.floor((elapsedAfterCrowd / 2000) * backgroundFrameRate) %
         backgroundFrames.length;
       currentBackground = backgroundFrames[frameIndex];
     }
