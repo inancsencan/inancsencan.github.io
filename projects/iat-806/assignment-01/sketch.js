@@ -1,5 +1,4 @@
 // TODO for myself
-// bottom chat window gets text, changing in every x seconds
 // after some time, when "just monika" starts playing, monika covers the scene
 
 // - Interactions -
@@ -28,6 +27,7 @@ let sayoriDanceCreepy = [];
 
 // define images
 let chatImage;
+let monikaImage;
 
 // sound effect variables
 let hoverSound;
@@ -50,6 +50,7 @@ let numRows = 9;
 const gridWidth = 900;
 const gridHeight = 900;
 const extraCanvasHeight = 200;
+const monikaImageStartTime = 11 * 60 + 55;
 
 // define stages for background
 const backgroundStages = [
@@ -64,11 +65,16 @@ let rowHeight;
 let colors = [];
 let stageBackgrounds = [];
 let sketchStartTime;
+let dialogueTimeline = [];
 
 // track animation progress individually
 let animationProgress = [];
 let animationSets = [];
-let creepyThresholds = [];
+let creepyStates = [];
+let creepyStateChangeTimes = [];
+let currentDialogueKey = null;
+let dialogueStartedAt = 0;
+const dialogueCharacterInterval = 35;
 
 async function setup() {
   // defines canvas
@@ -82,13 +88,15 @@ async function setup() {
     colors[i] = [];
     animationProgress[i] = [];
     animationSets[i] = [];
-    creepyThresholds[i] = [];
+    creepyStates[i] = [];
+    creepyStateChangeTimes[i] = [];
     for (let j = 0; j < numRows; j++) {
       colors[i][j] = color(random(255), random(255), random(255));
 
       // record animation progress for each cell
       animationProgress[i][j] = 0;
-      creepyThresholds[i][j] = random();
+      creepyStates[i][j] = false;
+      creepyStateChangeTimes[i][j] = random(1, 3);
     }
   }
   for (let i = 0; i < numFrames; i++) {
@@ -124,6 +132,27 @@ async function setup() {
 
   // load images
   chatImage = await loadImage("images/chat.png");
+  monikaImage = await loadImage("monikammmmm.png");
+  const dialogueCsv = (await loadStrings("ddlc_timeline.csv")).join("\n");
+  const csvRecords = parseCsv(dialogueCsv);
+  const [headers, ...rows] = csvRecords;
+  if (!headers) {
+    throw new Error("Dialogue CSV is empty.");
+  }
+  const timeSecondsIndex = headers.indexOf("time_seconds");
+  const typeIndex = headers.indexOf("type");
+  const textIndex = headers.indexOf("text");
+  if (timeSecondsIndex < 0 || typeIndex < 0 || textIndex < 0) {
+    throw new Error("Dialogue CSV is missing a required header.");
+  }
+  dialogueTimeline = rows
+    .filter((row) => row[typeIndex] === "dialogue")
+    .map((row) => ({
+      timeSeconds: Number(row[timeSecondsIndex]),
+      text: row[textIndex] || "",
+    }))
+    .filter((dialogue) => Number.isFinite(dialogue.timeSeconds))
+    .sort((a, b) => a.timeSeconds - b.timeSeconds);
   for (const stage of backgroundStages) {
     stageBackgrounds.push(await loadImage(stage.imagePath));
   }
@@ -215,7 +244,7 @@ function draw() {
   rowHeight = gridHeight / numRows;
 
   // Chance of changing to each character's creepy dance increases with time.
-  let creepyChance = constrain(elapsedTime / 120, 0, 1);
+  let creepyChance = constrain(elapsedTime / 690, 0, 1);
   console.log(creepyChance);
 
   // get the hovered cell indices
@@ -239,20 +268,20 @@ function draw() {
         numFrames;
       // frameIndex stays the same because math.floor
       let frameIndex = Math.floor(animationProgress[i][j]);
-      // Switch each character once its individual transition point is reached.
-      if (
-        creepyChance >= creepyThresholds[i][j] &&
-        !isCreepyDanceSet(animationSets[i][j])
-      ) {
-        animationSets[i][j] = getCreepyDanceSet(animationSets[i][j]);
+      if (elapsedTime >= creepyStateChangeTimes[i][j]) {
+        creepyStates[i][j] = random() < creepyChance;
+        creepyStateChangeTimes[i][j] = elapsedTime + random(1, 3);
       }
+      let currentAnimation = creepyStates[i][j]
+        ? getCreepyDanceSet(animationSets[i][j])
+        : animationSets[i][j];
       // hovered cell is skipped to be drawn later
       if (i === hoveredCol && j === hoveredRow) {
         continue;
       }
       let cellColor = colors[i][j];
       drawCharacterShape(
-        animationSets[i][j],
+        currentAnimation,
         xPosition,
         yPosition,
         colWidth,
@@ -261,7 +290,7 @@ function draw() {
         100,
       );
       animate(
-        animationSets[i][j],
+        currentAnimation,
         frameIndex,
         xPosition,
         yPosition,
@@ -304,11 +333,104 @@ function draw() {
     pop();
   }
 
+  if (audioEnabled && elapsedTime >= monikaImageStartTime) {
+    imageMode(CORNER);
+    image(monikaImage, 0, 0, gridWidth, gridHeight);
+  }
+
   // load chat image
   imageMode(CORNER);
   tint(255, 225);
   image(chatImage, 0, gridHeight, gridWidth, extraCanvasHeight);
   noTint();
+  if (audioEnabled) {
+    const dialogue = getDialogueAtTime(elapsedTime);
+    if (dialogue) {
+      drawDialogue(dialogue.text, dialogue);
+    }
+  }
+}
+
+function getDialogueAtTime(elapsedTime) {
+  let dialogue = null;
+  for (const entry of dialogueTimeline) {
+    if (entry.timeSeconds > elapsedTime) {
+      break;
+    }
+    dialogue = entry;
+  }
+  return dialogue;
+}
+
+function parseCsv(csvText) {
+  const records = [];
+  let record = [];
+  let field = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const character = csvText[i];
+    if (character === '"') {
+      if (insideQuotes && csvText[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (character === "," && !insideQuotes) {
+      record.push(field);
+      field = "";
+    } else if ((character === "\n" || character === "\r") && !insideQuotes) {
+      if (character === "\r" && csvText[i + 1] === "\n") {
+        i++;
+      }
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+
+  if (field || record.length > 0) {
+    record.push(field);
+    records.push(record);
+  }
+  if (records.length > 0) {
+    records[0][0] = records[0][0].replace(/^\uFEFF/, "");
+  }
+  return records;
+}
+
+function drawDialogue(dialogueText, dialogueKey = dialogueText) {
+  if (dialogueKey !== currentDialogueKey) {
+    currentDialogueKey = dialogueKey;
+    dialogueStartedAt = millis();
+  }
+  const visibleCharacterCount = Math.min(
+    dialogueText.length,
+    Math.floor((millis() - dialogueStartedAt) / dialogueCharacterInterval) + 1,
+  );
+
+  push();
+  textFont("Arial Rounded MT Bold, Arial, sans-serif");
+  textStyle(BOLD);
+  textSize(26);
+  textLeading(34);
+  textAlign(LEFT, TOP);
+  stroke(0);
+  strokeWeight(5);
+  strokeJoin(ROUND);
+  fill(255);
+  text(
+    dialogueText.slice(0, visibleCharacterCount),
+    40,
+    gridHeight + 40,
+    gridWidth - 60,
+    extraCanvasHeight - 48,
+  );
+  pop();
 }
 
 function getCreepyDanceSet(frames) {
@@ -322,15 +444,6 @@ function getCreepyDanceSet(frames) {
     return yuriDanceCreepy;
   }
   return sayoriDanceCreepy;
-}
-
-function isCreepyDanceSet(frames) {
-  return (
-    frames === monikaDanceCreepy ||
-    frames === natsukiDanceCreepy ||
-    frames === yuriDanceCreepy ||
-    frames === sayoriDanceCreepy
-  );
 }
 
 function drawCharacterShape(
