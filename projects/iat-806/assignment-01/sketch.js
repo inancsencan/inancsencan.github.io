@@ -28,6 +28,7 @@ let sayoriDanceCreepy = [];
 // define images
 let chatImage;
 let monikaImage;
+let startImage;
 
 // sound effect variables
 let hoverSound;
@@ -132,7 +133,8 @@ async function setup() {
 
   // load images
   chatImage = await loadImage("images/chat.png");
-  monikaImage = await loadImage("monikammmmm.png");
+  monikaImage = await loadImage("images/monikammmmm.png");
+  startImage = await loadImage("images/start.png");
   const dialogueCsv = (await loadStrings("ddlc_timeline.csv")).join("\n");
   const csvRecords = parseCsv(dialogueCsv);
   const [headers, ...rows] = csvRecords;
@@ -239,115 +241,124 @@ function draw() {
   imageMode(CORNER);
   image(stageBackgrounds[currentStage], 0, 0, width, height);
 
-  // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
-  colWidth = gridWidth / numCols;
-  rowHeight = gridHeight / numRows;
+  // if play mode, draw everything
+  if (audioEnabled == true) {
+    // we can actually move this to the setup since it is not interactive anymore, but we will keep it here
+    colWidth = gridWidth / numCols;
+    rowHeight = gridHeight / numRows;
 
-  // Chance of changing to each character's creepy dance increases with time.
-  let creepyChance = constrain(elapsedTime / 690, 0, 1);
-  console.log(creepyChance);
+    // Chance of changing to each character's creepy dance increases with time.
+    let creepyChance = constrain(elapsedTime / 690, 0, 1);
+    console.log(creepyChance);
 
-  // get the hovered cell indices
-  let [hoveredCol, hoveredRow] = getHoveredCell();
-  // main nested loop
-  for (let i = 0; i < numCols; i++) {
-    for (let j = 0; j < numRows; j++) {
-      // using center of each cell
-      let xPosition = i * colWidth + colWidth / 2;
-      let yPosition = j * rowHeight + rowHeight / 2;
-      // distance to mouse position
-      let distTemp = dist(mouseX, mouseY, xPosition, yPosition);
-      // map distance to speed and constrain it between min and max
-      let speedTemp = constrain(
-        map(distTemp, 0, 500, maxSpeed, minSpeed),
-        minSpeed,
-        maxSpeed,
-      );
-      animationProgress[i][j] =
-        (animationProgress[i][j] + deltaTime / ((1000 / 60) * speedTemp)) %
-        numFrames;
-      // frameIndex stays the same because math.floor
-      let frameIndex = Math.floor(animationProgress[i][j]);
-      if (elapsedTime >= creepyStateChangeTimes[i][j]) {
-        creepyStates[i][j] = random() < creepyChance;
-        creepyStateChangeTimes[i][j] = elapsedTime + random(1, 3);
-      }
-      let currentAnimation = creepyStates[i][j]
-        ? getCreepyDanceSet(animationSets[i][j])
-        : animationSets[i][j];
-      // hovered cell is skipped to be drawn later
-      if (i === hoveredCol && j === hoveredRow) {
-        continue;
-      }
-      let cellColor = colors[i][j];
-      drawCharacterShape(
-        currentAnimation,
-        xPosition,
-        yPosition,
-        colWidth,
-        rowHeight,
-        cellColor,
-        100,
-      );
-      animate(
-        currentAnimation,
-        frameIndex,
-        xPosition,
-        yPosition,
-        colWidth,
-        rowHeight,
-      );
+    // get the hovered cell indices
+    let [hoveredCol, hoveredRow] = getHoveredCell();
+    // main nested loop
+    for (let i = 0; i < numCols; i++) {
+      for (let j = 0; j < numRows; j++) {
+        // using center of each cell
+        let xPosition = i * colWidth + colWidth / 2;
+        let yPosition = j * rowHeight + rowHeight / 2;
+        // distance to mouse position
+        let distTemp = dist(mouseX, mouseY, xPosition, yPosition);
+        // map distance to speed and constrain it between min and max
+        let speedTemp = constrain(
+          map(distTemp, 0, 500, maxSpeed, minSpeed),
+          minSpeed,
+          maxSpeed,
+        );
+        animationProgress[i][j] =
+          (animationProgress[i][j] + deltaTime / ((1000 / 60) * speedTemp)) %
+          numFrames;
+        // frameIndex stays the same because math.floor
+        let frameIndex = Math.floor(animationProgress[i][j]);
+        if (elapsedTime >= creepyStateChangeTimes[i][j]) {
+          creepyStates[i][j] = random() < creepyChance;
+          creepyStateChangeTimes[i][j] = elapsedTime + random(1, 3);
+        }
+        let currentAnimation = creepyStates[i][j]
+          ? getCreepyDanceSet(animationSets[i][j])
+          : animationSets[i][j];
+        // hovered cell is skipped to be drawn later
+        if (i === hoveredCol && j === hoveredRow) {
+          continue;
+        }
+        let cellColor = colors[i][j];
+        drawCharacterShape(
+          currentAnimation,
+          xPosition,
+          yPosition,
+          colWidth,
+          rowHeight,
+          cellColor,
+          100,
+        );
+        animate(
+          currentAnimation,
+          frameIndex,
+          xPosition,
+          yPosition,
+          colWidth,
+          rowHeight,
+        );
 
-      // Debug coordinates
-      /* fill(255);
+        // Debug coordinates
+        /* fill(255);
       textAlign(CENTER, CENTER);
       textSize(14);
       text(`[${i}][${j}]`, xPosition, yPosition); */
+      }
     }
-  }
 
-  if (hoveredCol !== -1 && hoveredRow !== -1) {
-    let targetX = hoveredCol * colWidth + colWidth / 2;
-    let targetY = hoveredRow * rowHeight + rowHeight / 2;
-    let targetFrameIndex = Math.floor(
-      animationProgress[hoveredCol][hoveredRow],
-    );
-    let hoveredAnimation = monikaJump;
+    if (hoveredCol !== -1 && hoveredRow !== -1) {
+      let targetX = hoveredCol * colWidth + colWidth / 2;
+      let targetY = hoveredRow * rowHeight + rowHeight / 2;
+      let targetFrameIndex = Math.floor(
+        animationProgress[hoveredCol][hoveredRow],
+      );
+      let hoveredAnimation = monikaJump;
 
-    // drawing the hovered cell which was skipped
-    // using push/pop, translate, and scale, to scale everything from center
-    push();
-    translate(targetX, targetY);
-    scale(3);
-    drawCharacterShape(
-      monikaDance,
-      0,
-      0,
-      colWidth,
-      rowHeight,
-      colors[hoveredCol][hoveredRow],
-      150,
-      true,
-    );
-    animate(hoveredAnimation, targetFrameIndex, 0, 0, colWidth, rowHeight);
-    pop();
-  }
+      // drawing the hovered cell which was skipped
+      // using push/pop, translate, and scale, to scale everything from center
 
-  if (audioEnabled && elapsedTime >= monikaImageStartTime) {
+      push();
+      translate(targetX, targetY);
+      scale(3);
+      drawCharacterShape(
+        monikaDance,
+        0,
+        0,
+        colWidth,
+        rowHeight,
+        colors[hoveredCol][hoveredRow],
+        150,
+        true,
+      );
+      animate(hoveredAnimation, targetFrameIndex, 0, 0, colWidth, rowHeight);
+      pop();
+    }
+    console.log(audioEnabled);
+    if (audioEnabled && elapsedTime >= monikaImageStartTime) {
+      imageMode(CORNER);
+      image(monikaImage, 0, 0, gridWidth, gridHeight);
+    }
+
+    // load chat image
     imageMode(CORNER);
-    image(monikaImage, 0, 0, gridWidth, gridHeight);
-  }
-
-  // load chat image
-  imageMode(CORNER);
-  tint(255, 225);
-  image(chatImage, 0, gridHeight, gridWidth, extraCanvasHeight);
-  noTint();
-  if (audioEnabled) {
-    const dialogue = getDialogueAtTime(elapsedTime);
-    if (dialogue) {
-      drawDialogue(dialogue.text, dialogue);
+    tint(255, 225);
+    image(chatImage, 0, gridHeight, gridWidth, extraCanvasHeight);
+    noTint();
+    if (audioEnabled) {
+      const dialogue = getDialogueAtTime(elapsedTime);
+      if (dialogue) {
+        drawDialogue(dialogue.text, dialogue);
+      }
     }
+    // if start mode, draw logo and dim background
+  } else {
+    imageMode(CENTER);
+    background(0, 100);
+    image(startImage, width / 2, height / 2, 800, 500);
   }
 }
 
