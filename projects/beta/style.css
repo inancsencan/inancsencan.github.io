@@ -1,0 +1,85 @@
+:root {
+  --page-bg: #242424;
+  --text: #f2f2f2;
+  --muted: #a7a7a7;
+  --line: #444444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.project-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+.back {
+  display: inline-block;
+
+  margin-bottom: 1.5rem;
+
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+
+  font-size: 2.5rem;
+  line-height: 1.1;
+}
+
+.tagline {
+  margin: 0 0 2rem;
+
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+h2 {
+  margin: 2.5rem 0 0.75rem;
+
+  font-size: 1.3rem;
+}
+
+p {
+  max-width: 44rem;
+}
+
+/* ---------------------------------------
+   Pixi render frame
+   --------------------------------------- */
+
+#scene-holder {
+  width: 100%;
+
+  margin-top: 2rem;
+
+  border: 1px solid var(--line);
+
+  background: #111;
+}
+
+#scene-holder canvas {
+  display: block;
+
+  width: 100%;
+  height: auto;
+}

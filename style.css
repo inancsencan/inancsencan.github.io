@@ -126,6 +126,14 @@ a {
   font-size: 0.95rem;
 }
 
+.card-list .project-thumbnail {
+  display: block;
+  width: 7rem;
+  aspect-ratio: 1;
+  margin-bottom: 0.75rem;
+  object-fit: cover;
+}
+
 a:hover {
   text-decoration: underline;
 }
