@@ -31,4 +31,15 @@ const experiments = [
     width: 720,
     height: 720,
   },
+
+  {
+    id: "interactive-circles",
+    title: "Interactive Circles",
+    path: "sketches/interactive-circles/",
+    thumbnail: "sketches/interactive-circles/thumbnail.jpg",
+    description:
+      "An interactive p5.js sketch exploring geometric repetition, color, and mouse interaction. The original canvas dimensions are preserved while the display scales responsively.",
+    width: 800,
+    height: 600,
+  },
 ];
