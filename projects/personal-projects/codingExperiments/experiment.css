@@ -1,0 +1,243 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: #211f1f;
+}
+
+body {
+  margin: 0;
+  background-color: #211f1f;
+  color: #f5f5f5;
+  font-family: Arial, sans-serif;
+}
+
+/* Main centered container */
+
+.experiment-container {
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 14px 0 80px;
+}
+
+/* Shared square frame */
+
+.experiment-frame {
+  position: relative;
+  width: 100%;
+
+  /* Default proportions */
+  aspect-ratio: 720 / 650;
+
+  background-color: #101010;
+  overflow: hidden;
+}
+
+/* Both panels occupy the same frame */
+
+.tab-panel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+/* Sketch */
+
+#sketch-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #101010;
+}
+
+/* Tabs underneath */
+
+.tab-navigation {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid #bbbbbb;
+}
+
+.tab-button {
+  padding: 18px 18px 15px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+
+  background: transparent;
+  color: #aaaaaa;
+
+  font-family: Consolas, monospace;
+  font-size: 16px;
+  font-weight: 400;
+
+  cursor: pointer;
+}
+
+.tab-button:hover {
+  color: white;
+}
+
+.tab-button.active {
+  color: white;
+  border-bottom-color: #eeeeee;
+}
+
+/* Project information */
+
+.experiment-info {
+  padding-top: 26px;
+}
+
+.experiment-info h1 {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.experiment-info p {
+  font-size: 17px;
+  line-height: 1.4;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+/* Code panel */
+
+#code-panel {
+  background-color: #101010;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#code-panel:not([hidden]) {
+  display: flex;
+}
+
+/* Code toolbar */
+
+.code-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 15px 20px;
+  background-color: #1a1a1a;
+}
+
+.code-filename {
+  color: #999;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+}
+
+#copy-code {
+  padding: 9px 14px;
+  background: #080808;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#copy-code:hover {
+  background: #333;
+}
+
+/* Scrollable code area */
+
+.code-viewer {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+
+  padding: 22px 0;
+  background-color: #101010;
+}
+
+/* Line numbers */
+
+.line-numbers {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+
+  min-width: 62px;
+  padding: 0 14px 0 10px;
+
+  border-right: 1px solid #333;
+  background-color: #101010;
+
+  color: #777;
+  text-align: right;
+  white-space: pre;
+
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* Prism code styles */
+
+.code-viewer pre[class*="language-"] {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: max-content;
+
+  margin: 0;
+  padding: 0 20px;
+
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+
+  font-size: 13px;
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.code-viewer code[class*="language-"] {
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  line-height: inherit;
+  text-shadow: none;
+  white-space: pre;
+}
+
+/* Responsive typography */
+
+@media (max-width: 600px) {
+  .experiment-container {
+    width: calc(100% - 20px);
+    padding-top: 10px;
+  }
+
+  .experiment-info h1 {
+    font-size: 28px;
+  }
+
+  .experiment-info p {
+    font-size: 15px;
+  }
+
+  .code-toolbar {
+    padding: 10px 12px;
+  }
+
+  .code-viewer {
+    padding: 14px 0;
+  }
+}

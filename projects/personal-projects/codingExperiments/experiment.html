@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Coding Experiment</title>
+
+    <!-- Prism syntax highlighting -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+    />
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"
+      defer
+    ></script>
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"
+      defer
+    ></script>
+
+    <!-- Our files -->
+    <link rel="stylesheet" href="experiment.css" />
+
+    <script src="experiments.js" defer></script>
+    <script src="experiment.js" defer></script>
+  </head>
+
+  <body>
+    <main class="experiment-container">
+      <!-- Shared display frame -->
+      <div class="experiment-frame">
+        <!-- Sketch -->
+        <section id="sketch-panel" class="tab-panel">
+          <iframe
+            id="sketch-frame"
+            title="Coding experiment"
+            sandbox="allow-scripts"
+          >
+          </iframe>
+        </section>
+
+        <!-- Code -->
+        <section id="code-panel" class="tab-panel" hidden>
+          <div class="code-toolbar">
+            <span class="code-filename">sketch.js</span>
+
+            <button id="copy-code" type="button">Copy Code</button>
+          </div>
+
+          <div class="code-viewer">
+            <div
+              id="line-numbers"
+              class="line-numbers"
+              aria-hidden="true"
+            ></div>
+
+            <pre class="language-javascript"><code
+            id="source-code"
+            class="language-javascript"></code></pre>
+          </div>
+        </section>
+      </div>
+
+      <!-- Tabs below the frame -->
+      <div class="tab-navigation">
+        <button class="tab-button active" data-tab="sketch">sketch</button>
+
+        <button class="tab-button" data-tab="code">code</button>
+      </div>
+
+      <!-- Project information -->
+      <section class="experiment-info">
+        <h1 id="experiment-title">Loading experiment...</h1>
+
+        <p id="experiment-description"></p>
+      </section>
+    </main>
+  </body>
+</html>

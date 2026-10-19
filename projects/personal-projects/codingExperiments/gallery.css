@@ -1,0 +1,122 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: #1e1e1e;
+  font-family: Arial, sans-serif;
+}
+
+/* Full-width gallery */
+
+.page-container {
+  width: 100%;
+  padding: 6px;
+}
+
+/* Responsive square grid */
+
+.gallery {
+  display: grid;
+
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+
+  gap: 6px;
+}
+
+/* Individual sketch card */
+
+.sketch-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 5px;
+  text-decoration: none;
+  color: white;
+  background-color: #000;
+}
+
+/* Thumbnail image */
+
+.sketch-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.3s ease;
+}
+
+/* Hover darkening */
+
+.sketch-card:hover img {
+  filter: brightness(0.5);
+}
+
+/* Title overlay */
+
+.sketch-card h2 {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 0;
+  padding: 15px;
+
+  font-size: 24px;
+  font-weight: 500;
+  text-align: center;
+
+  color: #ff8c00;
+
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Show title on hover */
+
+.sketch-card:hover h2 {
+  opacity: 1;
+}
+
+/* Keyboard accessibility */
+
+.sketch-card:focus-visible {
+  outline: 3px solid #ff8c00;
+  outline-offset: -3px;
+}
+
+.sketch-card:focus-visible h2 {
+  opacity: 1;
+}
+
+.sketch-card:focus-visible img {
+  filter: brightness(0.5);
+}
+
+/* Mobile devices */
+
+@media (max-width: 600px) {
+  .gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sketch-card h2 {
+    font-size: 16px;
+  }
+}
+
+@media (hover: none) {
+  .sketch-card h2 {
+    opacity: 1;
+    font-size: 14px;
+    align-items: flex-end;
+    justify-content: flex-start;
+    background: linear-gradient(transparent 55%, rgba(0, 0, 0, 0.7));
+    color: white;
+  }
+}
