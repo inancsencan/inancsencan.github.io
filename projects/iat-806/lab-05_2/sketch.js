@@ -6,9 +6,18 @@ let balls = [];
 // Number of balls created per frame
 let ballsPerFrame = 5;
 
+// States. Just states.
+let isPainting = false;
+let isStirring = false;
+
 function setup() {
   // Create the canvas
-  createCanvas(800, 800);
+  let canvas = createCanvas(800, 800);
+
+  // Prevent the right-click menu from appearing over the canvas
+  canvas.elt.addEventListener("contextmenu", function (event) {
+    event.preventDefault();
+  });
 
   // Set the initial background color
   background(20);
@@ -19,7 +28,7 @@ function draw() {
   background(20, 10);
 
   // Create new balls only while the left mouse button is pressed
-  if (mouseIsPressed) {
+  if (isPainting) {
     // Create a fixed number of balls every frame
     for (let i = 0; i < ballsPerFrame; i++) {
       // New balls start at the mouse position
@@ -64,8 +73,16 @@ class Ball {
 
   // Run the ball's behaviors every frame
   update() {
+    // Apply the stirring force only when RMB is pressed
+    this.stir(isStirring ? 0.2 : 0);
+
+    // Gradually reduce velocity
     this.slowDown(0.98);
+
+    // Update position
     this.move();
+
+    // Draw the ball
     this.show();
   }
 
@@ -85,6 +102,31 @@ class Ball {
     }
   }
 
+  // Stir nearby particles in a circular motion around the mouse
+  stir(strength) {
+    // Calculate the distance from the ball to the mouse
+    let dx = this.x - mouseX;
+    let dy = this.y - mouseY;
+    let d = dist(this.x, this.y, mouseX, mouseY);
+
+    // Define the area affected by the stirring
+    let radius = 120;
+
+    // Only affect balls inside the stirring area
+    if (d > 0 && d < radius) {
+      // Make the force stronger near the mouse
+      let influence = 1 - d / radius;
+
+      // Calculate the direction perpendicular to the mouse-ball line
+      let stirX = -dy / d;
+      let stirY = dx / d;
+
+      // Add the stirring force to the ball's velocity
+      this.xDir += stirX * strength * influence;
+      this.yDir += stirY * strength * influence;
+    }
+  }
+
   // Move the ball according to its current velocity
   move() {
     this.x += this.xDir;
@@ -97,4 +139,30 @@ class Ball {
     fill(this.color);
     circle(this.x, this.y, this.r);
   }
+}
+
+// Track which mouse button is pressed
+function mousePressed(event) {
+  if (event.button === 0) {
+    isPainting = true;
+  }
+
+  if (event.button === 2) {
+    isStirring = true;
+  }
+
+  return false;
+}
+
+// Stop the corresponding interaction when released
+function mouseReleased(event) {
+  if (event.button === 0) {
+    isPainting = false;
+  }
+
+  if (event.button === 2) {
+    isStirring = false;
+  }
+
+  return false;
 }
