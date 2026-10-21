@@ -1,98 +1,150 @@
-console.log("Particle Inertia");
+console.log("Particle Painting");
 
-// Store all the balls in an array
+// Global variables
 let balls = [];
-
-// Number of balls created per frame
 let ballsPerFrame = 5;
 
-// States. Just states.
+// Mouse interaction states
 let isPainting = false;
 let isStirring = false;
+let isSwirling = false;
+
+// Brush colors
+let brushColor;
+let targetBrushColor;
+
+// Separate layer to store the painting
+let paintLayer;
 
 function setup() {
-  // Create the canvas
   let canvas = createCanvas(800, 800);
 
-  // Prevent the right-click menu from appearing over the canvas
+  // Hide the mouse cursor over the canvas
+  canvas.elt.style.cursor = "none";
+
+  // Create a separate layer for painting
+  paintLayer = createGraphics(width, height);
+
+  // Set the painting background
+  paintLayer.background(20);
+
+  // Prevent right-click context menu
   canvas.elt.addEventListener("contextmenu", function (event) {
     event.preventDefault();
   });
 
-  // Set the initial background color
+  // Prevent middle-click auto-scrolling
+  canvas.elt.addEventListener("auxclick", function (event) {
+    if (event.button === 1) {
+      event.preventDefault();
+    }
+  });
+
+  // Initialize brush colors
+  brushColor = lerpColor(
+    color(random(255), random(255), random(255)),
+    color(255),
+    0.6,
+  );
+
+  targetBrushColor = lerpColor(
+    color(random(255), random(255), random(255)),
+    color(255),
+    0.6,
+  );
+
   background(20);
 }
 
 function draw() {
-  // Draw a transparent background to create fading trails
-  background(20, 10);
+  // Generate a new target color every 60 frames
+  if (frameCount % 60 === 0) {
+    targetBrushColor = lerpColor(
+      color(random(255), random(255), random(255)),
+      color(255),
+      0.0,
+    );
+  }
 
-  // Create new balls only while the left mouse button is pressed
+  // Gradually transition between colors
+  brushColor = lerpColor(brushColor, targetBrushColor, 0.01);
+
+  // Create new balls while LMB is pressed
   if (isPainting) {
-    // Create a fixed number of balls every frame
     for (let i = 0; i < ballsPerFrame; i++) {
-      // New balls start at the mouse position
       let ballX = mouseX;
       let ballY = mouseY;
-
-      // Give each ball a random color
-      let ballColor = color(random(255), random(255), random(255));
-
-      // Define the diameter and initial speed
-      let ballR = 3;
+      let ballColor = brushColor;
+      let ballR = 10;
       let ballSpeed = 2;
 
-      // Create a new ball object
       let ball = new Ball(ballX, ballY, ballColor, ballR, ballSpeed);
-
-      // Add the new ball to the array
       balls.push(ball);
     }
   }
 
-  // Update every ball, including older ones
+  // Update all existing balls
   for (let ball of balls) {
     ball.update();
   }
+
+  // Display the painting on the main canvas
+  image(paintLayer, 0, 0);
+
+  // Check whether the mouse is inside the canvas
+  if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+    // Draw a preview of the current brush color
+    fill(brushColor);
+    stroke(255);
+    strokeWeight(1);
+    circle(mouseX, mouseY, 20);
+  }
 }
 
-// Blueprint for creating individual balls
+// Ball class
 class Ball {
   constructor(x, y, c, r, s) {
-    // Store the ball's initial attributes
+    // Ball attributes
     this.x = x;
     this.y = y;
     this.color = c;
     this.r = r;
-    this.s = s;
 
-    // Give each ball a random initial velocity
+    // Initial velocity
     this.xDir = random(-s, s);
     this.yDir = random(-s, s);
   }
 
-  // Run the ball's behaviors every frame
+  // Update ball behaviors
   update() {
-    // Apply the stirring force only when RMB is pressed
-    this.stir(isStirring ? 0.2 : 0);
+    // Drag with RMB
+    if (isStirring) {
+      this.dragWithMouse(0.05, 80);
+    } else {
+      this.dragWithMouse(0, 80);
+    }
 
-    // Gradually reduce velocity
-    this.slowDown(0.98);
+    // Swirl with MMB
+    if (isSwirling) {
+      this.stir(0.2);
+    } else {
+      this.stir(0);
+    }
 
-    // Update position
+    // Apply friction, movement, and growth
+    this.slowDown(0.99);
     this.move();
+    this.grow(0.08, 25);
 
     // Draw the ball
     this.show();
   }
 
-  // Reduce the ball's velocity through friction
+  // Gradually reduce velocity until the ball stops
   slowDown(friction) {
-    // Multiply the velocity by a friction factor
     this.xDir *= friction;
     this.yDir *= friction;
 
-    // Stop very small movements completely
     if (abs(this.xDir) < 0.01) {
       this.xDir = 0;
     }
@@ -102,49 +154,76 @@ class Ball {
     }
   }
 
-  // Stir nearby particles in a circular motion around the mouse
+  // Gradually increase size up to a maximum
+  grow(amount, maxSize) {
+    this.r += amount;
+    this.r = min(this.r, maxSize);
+  }
+
+  // Move nearby balls in a circular motion
   stir(strength) {
-    // Calculate the distance from the ball to the mouse
     let dx = this.x - mouseX;
     let dy = this.y - mouseY;
     let d = dist(this.x, this.y, mouseX, mouseY);
 
-    // Define the area affected by the stirring
     let radius = 120;
 
-    // Only affect balls inside the stirring area
     if (d > 0 && d < radius) {
-      // Make the force stronger near the mouse
       let influence = 1 - d / radius;
 
-      // Calculate the direction perpendicular to the mouse-ball line
+      // Perpendicular direction for circular movement
       let stirX = -dy / d;
       let stirY = dx / d;
 
-      // Add the stirring force to the ball's velocity
       this.xDir += stirX * strength * influence;
       this.yDir += stirY * strength * influence;
     }
   }
 
-  // Move the ball according to its current velocity
+  // Pull nearby balls in the direction of mouse movement
+  dragWithMouse(strength, radius) {
+    let d = dist(this.x, this.y, mouseX, mouseY);
+
+    if (d < radius) {
+      // Calculate mouse movement
+      let mouseDX = mouseX - pmouseX;
+      let mouseDY = mouseY - pmouseY;
+
+      // Limit sudden movements
+      mouseDX = constrain(mouseDX, -20, 20);
+      mouseDY = constrain(mouseDY, -20, 20);
+
+      // Stronger influence closer to the mouse
+      let influence = 1 - d / radius;
+
+      // Apply force to velocity
+      this.xDir += mouseDX * strength * influence;
+      this.yDir += mouseDY * strength * influence;
+    }
+  }
+
+  // Update position using velocity
   move() {
     this.x += this.xDir;
     this.y += this.yDir;
   }
 
-  // Draw the ball on the canvas
+  // Draw the ball on the painting layer
   show() {
-    noStroke();
-    fill(this.color);
-    circle(this.x, this.y, this.r);
+    paintLayer.noStroke();
+    paintLayer.fill(this.color);
+    paintLayer.circle(this.x, this.y, this.r);
   }
 }
 
-// Track which mouse button is pressed
+// Activate mouse interactions
 function mousePressed(event) {
   if (event.button === 0) {
     isPainting = true;
+  }
+
+  if (event.button === 1) {
+    isSwirling = true;
   }
 
   if (event.button === 2) {
@@ -154,10 +233,14 @@ function mousePressed(event) {
   return false;
 }
 
-// Stop the corresponding interaction when released
+// Deactivate mouse interactions
 function mouseReleased(event) {
   if (event.button === 0) {
     isPainting = false;
+  }
+
+  if (event.button === 1) {
+    isSwirling = false;
   }
 
   if (event.button === 2) {
