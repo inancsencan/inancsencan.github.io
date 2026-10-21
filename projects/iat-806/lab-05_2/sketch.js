@@ -1,24 +1,30 @@
+//our general list of balls
 let balls = [];
-let numBalls = 1;
+
+//speed of ball generation
+let ballsPerSecond = 100;
+
+//counter to use later
+let spawnCounter = 0;
 
 function setup() {
   createCanvas(800, 800);
-
-  for (let i = 0; i < numBalls; i++) {
-    let ballX = 400;
-    let ballY = 500;
-    let ballColor = color(255);
-    let ballR = 8;
-    let ballSpeed = 10;
-
-    let ball = new Ball(ballX, ballY, ballColor, ballR, ballSpeed);
-    balls.push(ball);
-  }
+  background(20);
 }
 
 function draw() {
-  background(20);
+  background(20, 10);
 
+  // Create new balls while the mouse is pressed
+  if (mouseIsPressed) {
+    background(120, 50);
+    let ballColor = color(random(255), random(255), random(255));
+    let ball = new Ball(mouseX, mouseY, ballColor, 3, 2);
+
+    balls.push(ball);
+  }
+
+  // Update all existing balls
   for (let ball of balls) {
     ball.update();
   }
@@ -33,12 +39,14 @@ class Ball {
     this.s = s;
     this.xDir = random(-s, s);
     this.yDir = random(-s, s);
+    this.personality = random([-1, 1]);
   }
 
   update() {
     this.move();
+    this.reactToMouse(0.05);
     this.show();
-    this.reset();
+    //this.reset();
   }
 
   move() {
@@ -57,5 +65,15 @@ class Ball {
       this.x = mouseX;
       this.y = mouseY;
     }
+  }
+
+  // Moves the ball toward or away from the mouse
+  // depending on its personality.
+  reactToMouse(strength) {
+    let dx = mouseX - this.x;
+    let dy = mouseY - this.y;
+
+    this.x += dx * strength * this.personality;
+    this.y += dy * strength * this.personality;
   }
 }
