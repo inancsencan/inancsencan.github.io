@@ -21,24 +21,22 @@ function setup() {
 
   // Hide the mouse cursor over the canvas
   canvas.elt.style.cursor = "none";
-
-  // Create a separate layer for painting
-  paintLayer = createGraphics(width, height);
-
-  // Set the painting background
-  paintLayer.background(20);
-
   // Prevent right-click context menu
   canvas.elt.addEventListener("contextmenu", function (event) {
     event.preventDefault();
   });
-
   // Prevent middle-click auto-scrolling
   canvas.elt.addEventListener("auxclick", function (event) {
     if (event.button === 1) {
       event.preventDefault();
     }
   });
+
+  // Create a separate layer for painting
+  paintLayer = createGraphics(width, height);
+
+  // Set the painting background
+  paintLayer.background(20);
 
   // Initialize brush colors
   brushColor = lerpColor(
@@ -75,7 +73,7 @@ function draw() {
       let ballX = mouseX;
       let ballY = mouseY;
       let ballColor = brushColor;
-      let ballR = 10;
+      let ballR = 5;
       let ballSpeed = 2;
 
       let ball = new Ball(ballX, ballY, ballColor, ballR, ballSpeed);
@@ -119,7 +117,7 @@ class Ball {
   update() {
     // Drag with RMB
     if (isStirring) {
-      this.dragWithMouse(0.05, 80);
+      this.dragWithMouse(0.05, 150);
     } else {
       this.dragWithMouse(0, 80);
     }
@@ -134,7 +132,7 @@ class Ball {
     // Apply friction, movement, and growth
     this.slowDown(0.99);
     this.move();
-    this.grow(0.08, 25);
+    this.grow(0.08, 15);
 
     // Draw the ball
     this.show();
@@ -210,9 +208,11 @@ class Ball {
 
   // Draw the ball on the painting layer
   show() {
-    paintLayer.noStroke();
-    paintLayer.fill(this.color);
-    paintLayer.circle(this.x, this.y, this.r);
+    if (this.xDir != 0 && this.yDir != 0) {
+      paintLayer.noStroke();
+      paintLayer.fill(this.color);
+      paintLayer.circle(this.x, this.y, this.r);
+    }
   }
 }
 
