@@ -3,7 +3,7 @@ let bodySegmentationModel; //Define a variable to store the BodySegmentation mod
 let segmentation;
 
 let video;
-let numBalls = 2000;
+let numBalls = 1000;
 
 let options = {
   maskType: "person",
