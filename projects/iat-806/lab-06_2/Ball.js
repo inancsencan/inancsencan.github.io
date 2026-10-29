@@ -55,7 +55,7 @@ class Ball {
         this.sizeM -= 0.1;
         break;
     }
-    this.sizeM = constrain(this.sizeM, 0.5, 5);
+    this.sizeM = constrain(this.sizeM, 0.3, 3);
   }
 
   //uses segmentation.mask as input, which is an image

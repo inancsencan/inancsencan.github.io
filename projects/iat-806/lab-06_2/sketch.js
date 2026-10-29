@@ -15,6 +15,7 @@ let ballCount = 1000;
 //colors while balls are growing/shrinking
 let growColor = "red";
 let shrinkColor = "green";
+let sizeState;
 
 async function setup() {
   bodySegmentation = await ml5.bodySegmentation("BodyPix", options);
@@ -41,17 +42,19 @@ function draw() {
   //we type the colors now because why not
   background("black");
 
-  /* image(video, 0, 0);
-  if (segmentation) {
-    image(segmentation.mask, 0, 0, width, height);
-  } */
+  //big balls if mouse is on left, small balls if on right
+  if (mouseX < width / 2) {
+    sizeState = "growing";
+  } else {
+    sizeState = "shrinking";
+  }
 
   //for as many balls there are in the array, update the balls
   for (let i = 0; i < myBalls.length; i++) {
     if (segmentation) {
       let active = myBalls[i].isOnBody(segmentation.mask);
       myBalls[i].respond(active);
-      myBalls[i].update(5, myBalls[i].c, "neutral");
+      myBalls[i].update(5, myBalls[i].c, sizeState);
     }
   }
 }
