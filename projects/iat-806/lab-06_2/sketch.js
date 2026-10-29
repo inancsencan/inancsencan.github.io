@@ -1,19 +1,20 @@
 //single ball used for initial testing, maybe use for debugging later
 let ball1;
 
+//makes an empty array of myBalls
 let myBalls = [];
+//how many balls
 let ballCount = 1000;
-let randomColor;
-let initColor;
-let growColor;
-let shrinkColor;
+//colors while balls are growing/shrinking
+let growColor = "red";
+let shrinkColor = "green";
 
 function setup() {
-  initColor = color(255, 255, 255);
-  growColor = color(255, 0, 0);
-  shrinkColor = color(0, 0, 255);
+  //canvas size, we used to work with 600/600 because it is
+  //the smallest number that can be divided by many numbers
   createCanvas(600, 600);
 
+  //from 0 until ball count, make balls
   for (let i = 0; i < ballCount; i++) {
     ball1 = createRandomBall();
     myBalls.push(ball1);
@@ -21,31 +22,30 @@ function setup() {
 }
 
 function draw() {
-  background(0);
+  //we type the colors now because why not
+  background("black");
 
-  for (let i = 0; i < ballCount; i++) {
+  //for as many balls there are in the array, update the balls
+  for (let i = 0; i < myBalls.length; i++) {
     myBalls[i].update(5, myBalls[i].c, "neutral");
   }
-  //older code for single ball testing
-  /* if (ball1) {
-    if (mouseX < width / 2 - 50) {
-      ball1.update(5, growColor, "growing");
-    } else if (mouseX >= width / 2 - 50 && mouseX < width / 2 + 50) {
-      ball1.update(5, ball1.c, "neutral");
-    } else {
-      ball1.update(5, shrinkColor, "shrinking");
-    }
-  } */
 }
 
+//define positions, color, then make ball, return the ball
 function createRandomBall() {
   let posX = random(0, width);
   let posY = random(0, height);
   let randomC = color(random(0, 255), random(0, 255), random(0, 255));
-  let ballT = new Ball(posX, posY, 5, randomC);
+  let ballT = new Ball(posX, posY, 15, randomC);
   return ballT;
 }
 
-/* function mousePressed() {
-  ball1 = new Ball(width / 2, height / 2, 50, initColor);
-} */
+//change ball hovered by mouse and pressed
+function mousePressed() {
+  for (let i = 0; i < myBalls.length; i++) {
+    //create temp state for hovered ball
+    let hover = myBalls[i].contains(mouseX, mouseY);
+    //use that state to respond
+    myBalls[i].respond(hover);
+  }
+}
