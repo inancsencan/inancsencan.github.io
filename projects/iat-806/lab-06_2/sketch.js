@@ -1,3 +1,10 @@
+let bodySegmentation; //Define a variable to store the BodySegmentation model.
+let options = {
+  maskType: "person",
+};
+let video;
+let segmentation;
+
 //single ball used for initial testing, maybe use for debugging later
 let ball1;
 
@@ -9,7 +16,9 @@ let ballCount = 1000;
 let growColor = "red";
 let shrinkColor = "green";
 
-function setup() {
+async function setup() {
+  bodySegmentation = await ml5.bodySegmentation("BodyPix", options);
+
   //canvas size, we used to work with 600/600 because it is
   //the smallest number that can be divided by many numbers
   createCanvas(600, 600);
@@ -19,15 +28,31 @@ function setup() {
     ball1 = createRandomBall();
     myBalls.push(ball1);
   }
+
+  // Create the video and hide it
+  video = createCapture(VIDEO);
+  video.size(600, 600);
+  video.hide();
+  //Start detecting body parts from the webcam video
+  bodySegmentation.detectStart(video, gotResults);
 }
 
 function draw() {
   //we type the colors now because why not
   background("black");
 
+  /* image(video, 0, 0);
+  if (segmentation) {
+    image(segmentation.mask, 0, 0, width, height);
+  } */
+
   //for as many balls there are in the array, update the balls
   for (let i = 0; i < myBalls.length; i++) {
-    myBalls[i].update(5, myBalls[i].c, "neutral");
+    if (segmentation) {
+      let active = myBalls[i].isOnBody(segmentation.mask);
+      myBalls[i].respond(active);
+      myBalls[i].update(5, myBalls[i].c, "neutral");
+    }
   }
 }
 
@@ -48,4 +73,8 @@ function mousePressed() {
     //use that state to respond
     myBalls[i].respond(hover);
   }
+}
+
+function gotResults(result) {
+  segmentation = result;
 }

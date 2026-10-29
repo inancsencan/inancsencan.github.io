@@ -12,7 +12,7 @@ class Ball {
 
   //update function that handles other functions
   update(jitterAmp, ballColor, state) {
-    this.jitter(jitterAmp);
+    this.move(jitterAmp);
     this.changeSize(state);
     this.show(ballColor);
   }
@@ -24,7 +24,7 @@ class Ball {
   }
 
   //jitter movement. planning to add more moves.
-  jitter(jitterAmp) {
+  move(jitterAmp) {
     //get distance value
     let dif = this.orthoDist();
     //drifting prevention here
@@ -56,6 +56,14 @@ class Ball {
         break;
     }
     this.sizeM = constrain(this.sizeM, 0.5, 5);
+  }
+
+  //uses segmentation.mask as input, which is an image
+  isOnBody(mask) {
+    //gets the rgba value of the pixel at ball location
+    let pixel = mask.get(floor(this.x), floor(this.y)); // [r,g,b,a];
+    //returns alpha value as boolean conditioned to 128
+    return pixel[3] < 128;
   }
 
   contains(px, py) {
