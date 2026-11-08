@@ -81,9 +81,19 @@ class AngryBall extends Ball {
   constructor(x, y, fillColor, r, emojiText) {
     super(x, y, fillColor, r);
     this.emojiText = emojiText;
+    this.sizeMultiplier = 5;
   }
+
+  respond(active) {
+    if (active) {
+      this.sizeMultiplier = 5;
+    } else {
+      this.sizeMultiplier = 1;
+    }
+  }
+
   show() {
-    textSize(this.r * 5);
+    textSize(this.r * this.sizeMultiplier);
     noStroke();
     text(this.emojiText, this.x, this.y);
   }

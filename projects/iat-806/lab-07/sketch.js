@@ -53,7 +53,7 @@ function createRandomBall() {
   if (randomNumber < 0.2) {
     return new BubblyBall(ballX, ballY, ballC, ballR);
   } else if (randomNumber < 0.5) {
-    return new AngryBall(ballX, ballY, ballC, ballR, "😡");
+    return new AngryBall(ballX, ballY, ballC, ballR, "👺");
   }
   return new Ball(ballX, ballY, ballC, ballR);
 }
