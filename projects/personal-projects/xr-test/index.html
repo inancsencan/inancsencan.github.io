@@ -9,6 +9,43 @@
     <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   </head>
 
+  <div
+    id="status"
+    style="
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-family: sans-serif;
+      z-index: 999;
+    "
+  >
+    Checking WebXR...
+  </div>
+
+  <script>
+    async function checkARSupport() {
+      const status = document.getElementById("status");
+
+      if (!navigator.xr) {
+        status.textContent = "WebXR not available on this browser.";
+        return;
+      }
+
+      const supported = await navigator.xr.isSessionSupported("immersive-ar");
+
+      if (supported) {
+        status.textContent = "immersive-ar supported ✓";
+      } else {
+        status.textContent = "immersive-ar not supported on this device.";
+      }
+    }
+
+    checkARSupport();
+  </script>
+
   <body>
     <a-scene
       webxr="mode: ar;"

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Quest 3 WebXR Test</title>
+
+    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+  </head>
+
+  <body>
+    <div
+      id="status"
+      style="
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-family: sans-serif;
+        z-index: 999;
+      "
+    >
+      Checking WebXR...
+    </div>
+
+    <a-scene
+      webxr="optionalFeatures: plane-detection"
+      background="transparent: true"
+      xr-mode-ui="XRMode: ar"
+    >
+      <a-box
+        position="0 1.4 -2"
+        rotation="0 45 0"
+        width="0.4"
+        height="0.4"
+        depth="0.4"
+        color="#4CC3D9"
+      ></a-box>
+    </a-scene>
+
+    <script>
+      const status = document.getElementById("status");
+      const scene = document.querySelector("a-scene");
+
+      async function checkARSupport() {
+        if (!navigator.xr) {
+          status.textContent = "WebXR unavailable";
+          return;
+        }
+
+        const supported = await navigator.xr.isSessionSupported("immersive-ar");
+
+        status.textContent = supported
+          ? "immersive-ar supported ✓"
+          : "immersive-ar not supported";
+      }
+
+      checkARSupport();
+
+      scene.addEventListener("enter-vr", () => {
+        setTimeout(() => {
+          const session = scene.renderer.xr.getSession();
+
+          if (!session) {
+            status.textContent = "XR session not found";
+            return;
+          }
+
+          if (!("detectedPlanes" in session)) {
+            status.textContent = "XR active ✓ | plane-detection unavailable";
+            return;
+          }
+
+          function updatePlaneCount() {
+            status.textContent = `XR active ✓ | detected planes: ${session.detectedPlanes.size}`;
+
+            requestAnimationFrame(updatePlaneCount);
+          }
+
+          updatePlaneCount();
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

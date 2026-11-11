@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Quest 3 Passthrough Test</title>
+
+    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+  </head>
+
+  <body>
+    <div
+      id="status"
+      style="
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-family: sans-serif;
+        z-index: 999;
+      "
+    >
+      Checking WebXR...
+    </div>
+
+    <a-scene
+      webxr="mode: ar;"
+      background="transparent: true"
+      xr-mode-ui="XRMode: ar"
+    >
+      <a-assets>
+        <canvas id="testTexture" width="1024" height="512"></canvas>
+      </a-assets>
+
+      <a-plane
+        id="projectionPlane"
+        position="0 1.5 -3"
+        width="3"
+        height="2"
+        material="shader: flat; src: #testTexture"
+      >
+      </a-plane>
+
+      <a-box
+        position="0 1.4 -2"
+        rotation="0 45 0"
+        width="0.4"
+        height="0.4"
+        depth="0.4"
+        color="#4CC3D9"
+      >
+      </a-box>
+    </a-scene>
+
+    <script>
+      async function checkARSupport() {
+        const status = document.getElementById("status");
+
+        if (!navigator.xr) {
+          status.textContent = "WebXR not available on this browser.";
+          return;
+        }
+
+        const supported = await navigator.xr.isSessionSupported("immersive-ar");
+
+        if (supported) {
+          status.textContent = "immersive-ar supported ✓";
+        } else {
+          status.textContent = "immersive-ar not supported on this device.";
+        }
+      }
+
+      checkARSupport();
+
+      const canvas = document.getElementById("testTexture");
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#222";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#ff8844";
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.fillStyle = "#44aaff";
+      ctx.fillRect(512, 0, 512, 512);
+
+      ctx.fillStyle = "white";
+      ctx.font = "60px sans-serif";
+      ctx.fillText("AI IMAGE GOES HERE", 180, 280);
+
+      const plane = document.getElementById("projectionPlane");
+
+      plane.addEventListener("loaded", () => {
+        const mesh = plane.getObject3D("mesh");
+
+        if (mesh?.material?.map) {
+          mesh.material.map.needsUpdate = true;
+        }
+      });
+    </script>
+  </body>
+</html>
