@@ -55,6 +55,15 @@ let displayMask;
 let frozenMask = null;
 let frozenCollisionMask = null;
 
+// store every raw pose the player captures
+let recordedPoses = [];
+
+// store the Silhouette objects used in the game
+let silhouettes = [];
+
+// allow up to three frozen poses per attempt
+let maxSilhouettes = 3;
+
 // Balls.
 let balls = [];
 
@@ -151,16 +160,10 @@ function draw() {
     return;
   }
 
-  // draw the frozen silhouette if it exists
-  if (frozenMask && game.state !== "start") {
-    // paint it green
-    tint(0, 255, 0, 180);
-
-    // draw the frozen mask
-    image(frozenMask, 0, 0, width, height);
-
-    // revert the tint
-    noTint();
+  // draw each frozen silhouette we have recorded
+  for (let silhouette of silhouettes) {
+    // draw this silhouette with its own color
+    silhouette.show();
   }
 
   // draw the target bowl
@@ -230,6 +233,30 @@ function draw() {
 
   // draw the interface on top of the gameplay
   ui.draw(game, Boolean(frozenCollisionMask), Boolean(displayMask));
+
+  // only show the pose counter while preparing
+  if (game.state === "prepare") {
+    // keep the text style separate from the game
+    push();
+
+    // use a bright color that is visible on the grid
+    fill(210, 248, 255);
+
+    // do not draw text outlines
+    noStroke();
+
+    // choose a small text size
+    textSize(13);
+
+    // align the text to the bottom-left
+    textAlign(LEFT, BASELINE);
+
+    // show the pose limit and undo shortcut
+    text("POSES: " + silhouettes.length + "/" + maxSilhouettes + "   CLICK: ADD   BACKSPACE: UNDO", 24, height - 18);
+
+    // restore the previous drawing style
+    pop();
+  }
 }
 
 
@@ -251,15 +278,76 @@ function freezeMask() {
   // temporarily freezes the mask and records it in a variable
   if (game.state === "prepare" && displayMask && segmentation) {
 
+    // stop recording after three poses
+    if (recordedPoses.length >= maxSilhouettes) return;
+
     // save the visual silhouette
     frozenMask = displayMask.get();
 
     // save the original silhouette for collisions
-    frozenCollisionMask = segmentation.mask.get();
+    let newCollisionMask = segmentation.mask.get();
 
     // resize the collision mask to match the canvas
-    frozenCollisionMask.resize(width, height);
+    newCollisionMask.resize(width, height);
+
+    // remember this snapshot so we can build objects from it
+    recordedPoses.push({
+      // store the white visual image
+      display: frozenMask,
+
+      // store the actual solid collision image
+      collision: newCollisionMask,
+    });
+
+    // rebuild the visible objects and their shared collision mask
+    rebuildSilhouettes();
   }
+}
+
+
+// create a Silhouette object for every recorded pose
+function rebuildSilhouettes() {
+  // remove all the old Silhouette instances
+  silhouettes.splice(0, silhouettes.length);
+
+  // create a new instance for each saved pose using a loop
+  for (let i = 0; i < recordedPoses.length; i++) {
+    // get the saved images for this pose
+    let pose = recordedPoses[i];
+
+    // create and store a new Silhouette object
+    silhouettes.push(new Silhouette(pose.display, pose.collision, i));
+  }
+
+  // check whether all poses have been removed
+  if (silhouettes.length === 0) {
+    // remove the shared collision mask
+    frozenCollisionMask = null;
+
+    // remove the last frozen visual image
+    frozenMask = null;
+
+    // stop here because there is nothing to combine
+    return;
+  }
+
+  // make a temporary transparent image for combining masks
+  let combined = createGraphics(width, height);
+
+  // make sure it starts fully transparent
+  combined.clear();
+
+  // add every opaque body shape to the same image
+  for (let silhouette of silhouettes) {
+    // draw this silhouette's original collision mask
+    combined.image(silhouette.collisionMask, 0, 0, width, height);
+  }
+
+  // save the merged image for our existing Ball collision code
+  frozenCollisionMask = combined.get();
+
+  // remove the temporary graphics buffer to save memory
+  combined.remove();
 }
 
 
@@ -290,6 +378,12 @@ function resetScene() {
   // remove the frozen collision silhouette
   frozenCollisionMask = null;
 
+  // remove all recorded poses for the next attempt
+  recordedPoses.splice(0, recordedPoses.length);
+
+  // remove all frozen Silhouette objects
+  silhouettes.splice(0, silhouettes.length);
+
   // remove every existing ball from the array
   balls.splice(0, balls.length);
 
@@ -311,6 +405,21 @@ function keyPressed(event) {
     game.beginNewGame();
 
     // prevent the key from affecting the webpage
+    return false;
+  }
+
+  // check if BACKSPACE or DELETE was pressed
+  if (event.key === "Backspace" || event.key === "Delete") {
+    // only allow removing poses during preparation
+    if (game.state === "prepare" && recordedPoses.length > 0) {
+      // remove the most recently captured pose
+      recordedPoses.splice(recordedPoses.length - 1, 1);
+
+      // rebuild the objects and collision mask without that pose
+      rebuildSilhouettes();
+    }
+
+    // prevent BACKSPACE from navigating away from the page
     return false;
   }
 
