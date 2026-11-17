@@ -6,6 +6,8 @@ class UIManager {
       start: null,
       hud: null,
       end: null,
+      // store the central pause artwork
+      pause: null,
     };
   }
 
@@ -27,6 +29,15 @@ class UIManager {
     } catch (error) {
       // report an image problem without stopping the game
       console.error("Could not load the gameplay HUD:", error);
+    }
+
+    // try to load the central pause panel
+    try {
+      // wait until the pause image has loaded
+      this.images.pause = await loadImage("assets/hud-pause.png");
+    } catch (error) {
+      // report the missing image without stopping the game
+      console.error("Could not load the pause HUD:", error);
     }
   }
 
@@ -70,16 +81,8 @@ class UIManager {
 
       // check if the game is paused
     } else if (game.state === "paused") {
-      // keep the gameplay HUD visible behind the pause screen
-      this.drawHUD(game, "PAUSED", "");
-
-      // draw the pause screen
-      this.drawOverlay(
-        "PAUSED",
-        "Simulation stopped.",
-        "P: Resume  |  R: Retry",
-        game,
-      );
+      // draw the special pause panel
+      this.drawPauseScreen(game);
 
       // check if the player succeeded
     } else if (game.state === "won") {
@@ -241,6 +244,111 @@ class UIManager {
     text(ceil(game.timeLeft), 628, 56);
 
     // restore the previous drawing settings
+    pop();
+  }
+
+  // draw the pause screen using the new transparent image
+  drawPauseScreen(game) {
+    // save the current drawing settings
+    push();
+
+    // remove outlines
+    noStroke();
+
+    // darken the game behind the pause panel
+    fill(6, 12, 25, 155);
+
+    // cover the whole canvas with a transparent dark color
+    rect(0, 0, width, height);
+
+    // restore the drawing settings
+    pop();
+
+    // show the regular HUD and frozen timer at the top
+    this.drawHUD(game, "PAUSED", "");
+
+    // save the drawing settings for the center panel
+    push();
+
+    // show the new neon artwork if it loaded
+    if (this.images.pause) {
+      // place the transparent artwork over the scene
+      image(this.images.pause, 0, 0, width, height);
+    } else {
+      // use a backup dark panel if the image did not load
+      fill(16, 26, 44, 245);
+
+      // draw the backup panel in the center
+      rect(100, 120, width - 200, 345, 18);
+    }
+
+    // center the menu text inside its panels
+    textAlign(CENTER, CENTER);
+
+    // use bold letters for the main title
+    textStyle(BOLD);
+
+    // use a soft cyan color for the title
+    fill(215, 253, 255);
+
+    // make the title larger than the buttons
+    textSize(32);
+
+    // draw the title in the pink top frame
+    text("PAUSED", 400, 166);
+
+    // use bold white text for the three actions
+    fill(246, 250, 255);
+
+    // set the action text size
+    textSize(22);
+
+    // write the first action in its button
+    text("RESUME", 409, 251);
+
+    // write the second action in its button
+    text("RETRY", 409, 324);
+
+    // write the third action in its button
+    text("MAIN MENU", 409, 396);
+
+    // use thin outlines for the keyboard shortcuts
+    stroke(64, 224, 239, 190);
+
+    // make the shortcut outlines one pixel thick
+    strokeWeight(1);
+
+    // give the shortcuts a dark background
+    fill(7, 27, 42, 225);
+
+    // draw a keycap for the resume shortcut
+    rect(527, 237, 32, 29, 6);
+
+    // draw a keycap for the retry shortcut
+    rect(527, 310, 32, 29, 6);
+
+    // draw a keycap for the menu shortcut
+    rect(527, 382, 32, 29, 6);
+
+    // remove the outlines before drawing shortcut letters
+    noStroke();
+
+    // use cyan for the shortcut letters
+    fill(137, 246, 255);
+
+    // make the shortcut letters easy to read
+    textSize(16);
+
+    // draw the shortcut for resume
+    text("P", 543, 251);
+
+    // draw the shortcut for retry
+    text("R", 543, 324);
+
+    // draw the shortcut for the main menu
+    text("M", 543, 396);
+
+    // restore all drawing settings
     pop();
   }
 
