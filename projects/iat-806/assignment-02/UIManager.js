@@ -8,6 +8,10 @@ class UIManager {
       end: null,
       // store the central pause artwork
       pause: null,
+      // store the success artwork
+      success: null,
+      // store the failure artwork
+      failure: null,
     };
   }
 
@@ -39,6 +43,24 @@ class UIManager {
       // report the missing image without stopping the game
       console.error("Could not load the pause HUD:", error);
     }
+
+    // try to load the success panel
+    try {
+      // wait until the success image is available
+      this.images.success = await loadImage("assets/hud-success.png");
+    } catch (error) {
+      // explain which image did not load
+      console.error("Could not load the success HUD:", error);
+    }
+
+    // try to load the failure panel
+    try {
+      // wait until the failure image is available
+      this.images.failure = await loadImage("assets/hud-failure.png");
+    } catch (error) {
+      // explain which image did not load
+      console.error("Could not load the failure HUD:", error);
+    }
   }
 
   // save an image for a particular part of the interface
@@ -54,7 +76,7 @@ class UIManager {
       // draw the starting screen
       this.drawStartScreen();
 
-      // check if the player is preparing a pose
+    // check if the player is preparing a pose
     } else if (game.state === "prepare") {
       // choose the correct instruction
       let message = "Loading body detection...";
@@ -74,35 +96,25 @@ class UIManager {
       // draw the preparation HUD
       this.drawHUD(game, "PREPARE", message);
 
-      // check if the simulation is running
+    // check if the simulation is running
     } else if (game.state === "playing") {
       // draw the playing HUD
       this.drawHUD(game, "PLAYING", "P: Pause  |  R: Retry  |  M: Menu");
 
-      // check if the game is paused
+    // check if the game is paused
     } else if (game.state === "paused") {
       // draw the special pause panel
       this.drawPauseScreen(game);
 
-      // check if the player succeeded
+    // check if the player succeeded
     } else if (game.state === "won") {
       // draw the success screen
-      this.drawOverlay(
-        "SUCCESS!",
-        "The ball reached the bowl!",
-        "R: Retry  |  M: Menu",
-        game,
-      );
+      this.drawResultScreen(game, true);
 
-      // check if the attempt failed
+    // check if the attempt failed
     } else if (game.state === "gameOver") {
       // draw the failure screen
-      this.drawOverlay(
-        "TRY AGAIN!",
-        "The attempt has ended.",
-        "R: Retry  |  M: Menu",
-        game,
-      );
+      this.drawResultScreen(game, false);
     }
   }
 
@@ -349,6 +361,147 @@ class UIManager {
     text("M", 543, 396);
 
     // restore all drawing settings
+    pop();
+  }
+
+  // draw the success or failure screen
+  drawResultScreen(game, succeeded) {
+    // remember the current drawing settings
+    push();
+
+    // remove shape outlines
+    noStroke();
+
+    // darken the simulation but keep it visible
+    fill(6, 12, 25, 170);
+
+    // draw the dark layer over the game
+    rect(0, 0, width, height);
+
+    // restore the previous drawing settings
+    pop();
+
+    // keep the score and timer HUD visible at the top
+    this.drawHUD(game, "RESULT", "");
+
+    // remember the drawing settings for the central panel
+    push();
+
+    // choose the correct background artwork
+    let resultImage = succeeded ? this.images.success : this.images.failure;
+
+    // check whether the artwork loaded
+    if (resultImage) {
+      // place the transparent artwork over the game
+      image(resultImage, 0, 0, width, height);
+    } else {
+      // use a dark backup panel if the image is missing
+      fill(16, 26, 44, 245);
+
+      // draw the backup panel in the center
+      rect(120, 120, 560, 395, 18);
+    }
+
+    // use centered text in the empty title and action panels
+    textAlign(CENTER, CENTER);
+
+    // use bold text for the results
+    textStyle(BOLD);
+
+    // use a bright title color
+    fill(225, 253, 255);
+
+    // set the title size
+    textSize(30);
+
+    // show the result title inside the pink plaque
+    text(succeeded ? "SUCCESS!" : "TRY AGAIN!", 400, succeeded ? 256 : 233);
+
+    // choose white for the action labels
+    fill(245, 250, 255);
+
+    // use a readable label size
+    textSize(20);
+
+    // show the success information or failure action
+    if (succeeded) {
+      // show the successful shot message beside the checkmark
+      text("BALL DELIVERED!", 418, 333);
+
+      // show the retry action beside the orange arrow
+      text("RETRY", 418, 396);
+
+      // show the menu action beside the pink home icon
+      text("MAIN MENU", 418, 459);
+    } else {
+      // show the retry action beside the circular arrow
+      text("RETRY", 418, 308);
+
+      // show the menu action beside the home icon
+      text("MAIN MENU", 418, 373);
+
+      // use smaller text for the final attempt information
+      textSize(17);
+
+      // show the current number of attempts
+      text("ATTEMPT " + game.attempts + " ENDED", 418, 440);
+    }
+
+    // draw shortcuts for the real keyboard actions
+    if (succeeded) {
+      // label the retry shortcut
+      this.drawResultKey("R", 551, 396);
+
+      // label the menu shortcut
+      this.drawResultKey("M", 551, 459);
+    } else {
+      // label the retry shortcut
+      this.drawResultKey("R", 551, 308);
+
+      // label the menu shortcut
+      this.drawResultKey("M", 551, 373);
+    }
+
+    // restore the previous drawing settings
+    pop();
+  }
+
+  // draw a small keyboard shortcut box
+  drawResultKey(letter, x, y) {
+    // remember the current drawing settings
+    push();
+
+    // use a thin cyan outline
+    stroke(90, 230, 240, 210);
+
+    // use a one-pixel outline
+    strokeWeight(1);
+
+    // fill the key with dark blue
+    fill(6, 25, 39, 235);
+
+    // draw the shortcut box centered on its position
+    rect(x - 16, y - 14, 32, 28, 5);
+
+    // remove outlines from the text
+    noStroke();
+
+    // use pale cyan for the letter
+    fill(170, 250, 255);
+
+    // draw the letter in the center
+    textAlign(CENTER, CENTER);
+
+    // give the letter a simple bold style
+    textStyle(BOLD);
+
+    // set the letter size
+    textSize(16);
+
+    // draw the shortcut letter
+    text(letter, x, y);
+
+    // restore the previous drawing settings
     pop();
   }
 
